@@ -1,5 +1,6 @@
 import styles from './HomeScreen.module.css';
 import grassImage from '@/assets/layer0/grass.png';
+import waterImage from '@/assets/layer0/water.png';
 
 interface GridProps {
   grid: number[][];
@@ -7,9 +8,7 @@ interface GridProps {
 
 const cellTypeMapping: { [key: number]: string | undefined } = {
   0: grassImage,
-  // In the future, you can add more mappings here, e.g.:
-  // 1: styles.waterCell,
-  // 1: waterImage
+  1: waterImage,
 };
 
 function Grid({ grid }: GridProps) {

@@ -15,7 +15,17 @@ function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [prompt, setPrompt] = useState<string>('');
   const [responseText, setResponseText] = useState<string>('');
-  const [grid] = useState<number[][]>(() => Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0)));
+  const [grid] = useState<number[][]>(() => {
+    const newGrid = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+    // Let's add a small pond
+    newGrid[5][5] = 1;
+    newGrid[5][6] = 1;
+    newGrid[6][5] = 1;
+    newGrid[6][6] = 1;
+    newGrid[6][7] = 1;
+    newGrid[7][6] = 1;
+    return newGrid;
+  });
   
   useEffect(() => {
     if (isLoading) return;
