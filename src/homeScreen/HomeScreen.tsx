@@ -12,10 +12,17 @@ import Grid from "./Grid";
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 20;
 
+interface Position {
+  x: number;
+  y: number;
+}
+
 function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [prompt, setPrompt] = useState<string>('');
   const [responseText, setResponseText] = useState<string>('');
+  const [tileSize] = useState<number>(32);
+  const [playerPosition] = useState<Position>({ x: Math.floor(GRID_WIDTH / 2), y: Math.floor(GRID_HEIGHT / 2) });
   const [grid] = useState<number[][]>(() => {
     const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
     // Add a small pond in the center of the grid
@@ -54,7 +61,7 @@ function HomeScreen() {
     <div className={styles.container}>
       <TopBar />
       <div className={styles.content}>
-        <Grid grid={grid} width={GRID_WIDTH} height={GRID_HEIGHT} />
+        <Grid grid={grid} width={GRID_WIDTH} height={GRID_HEIGHT} playerPosition={playerPosition} tileSize={tileSize} />
         <div className={styles.prompt}>
           <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)}/>
           <ContentButton text="Send" onClick={() => submitPrompt(prompt, setPrompt, _onRespond)} /></p>
