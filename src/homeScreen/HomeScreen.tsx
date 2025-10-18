@@ -4,7 +4,8 @@ import WaitingEllipsis from '@/components/waitingEllipsis/WaitingEllipsis';
 import ContentButton from '@/components/contentButton/ContentButton';
 import LoadScreen from '@/loadScreen/LoadScreen';
 import TopBar from '@/components/topBar/TopBar';
-import Grid from '@/homeScreen/Grid';
+import Grid from '@/components/grid/Grid';
+import GridData from '@/components/grid/GridData';
 import { GENERATING, submitPrompt } from '@/homeScreen/interactions/prompt';
 import { Entity } from '@/persona/types';
 import styles from '@/homeScreen/HomeScreen.module.css';
@@ -22,24 +23,20 @@ function HomeScreen() {
   const [gameLog, setGameLog] = useState<string[]>(['Game started. Press Space to begin.']);
   const [turn, setTurn] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(true);
-  const [grid] = useState<number[][]>(() => {
-    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
-    // Add a small pond in the center of the grid
-    const centerX = Math.floor(GRID_WIDTH / 2);
-    const centerY = Math.floor(GRID_HEIGHT / 2);
-
-    // Safely create a small pond, ensuring it's within grid bounds
-    if (GRID_HEIGHT > 1 && GRID_WIDTH > 3) {
-      newGrid[centerY][centerX] = 1;
-      newGrid[centerY - 1][centerX + 1] = 1;
-    }
-    return newGrid;
-  });
   
   const [entities] = useState<Entity[]>([
     { id: 1, persona: new Pug(), position: { x: 1, y: 1 } },
     { id: 2, persona: new Roach(), position: { x: 3, y: 3 } },
   ]);
+
+  const [grid] = useState<number[][]>(() => {
+    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
+    // Place entities on the grid
+    for (const entity of entities) {
+      newGrid[entity.position.y][entity.position.x] = entity.id;
+    }
+    return newGrid;
+  });
 
   useEffect(() => {
     if (isLoading || isPaused) return;
@@ -112,7 +109,10 @@ function HomeScreen() {
             <p key={index}>{msg}</p>
           ))}
         </div>
-        <Grid grid={grid} width={GRID_WIDTH} height={GRID_HEIGHT} entities={entities} tileSize={tileSize} />
+        <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+          <Grid grid={grid} width={GRID_WIDTH} height={GRID_HEIGHT} entities={entities} tileSize={tileSize} />
+          <GridData grid={grid} />
+        </div>
         <div className={styles.prompt}>
           <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)} />
           <ContentButton text="Send" onClick={() => submitPrompt(prompt, setPrompt, _onRespond)} />
