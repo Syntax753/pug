@@ -87,9 +87,10 @@
   height: 100%;
 }
 
-.grassCell {
-  background-image: url('./images/grass.png');
-  background-size: cover;
+.tileImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   /* This gives the sprite a sharp, pixelated look */
   image-rendering: pixelated;
 }
