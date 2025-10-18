@@ -38,8 +38,8 @@ async function splitTiles() {
         await image
           .clone()
           .extract({
-            left: x * (TILE_WIDTH + PADDING),
-            top: y * (TILE_HEIGHT + PADDING),
+            left: 2 + x * (TILE_WIDTH + PADDING),
+            top: 2 + y * (TILE_HEIGHT + PADDING),
             width: TILE_WIDTH,
             height: TILE_HEIGHT,
           })
