@@ -9,8 +9,8 @@ import LoadScreen from '@/loadScreen/LoadScreen';
 import TopBar from '@/components/topBar/TopBar';
 import Grid from "./Grid";
 
-const GRID_WIDTH = 20;
-const GRID_HEIGHT = 20;
+const GRID_WIDTH = 40;
+const GRID_HEIGHT = 25;
 
 function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(false);

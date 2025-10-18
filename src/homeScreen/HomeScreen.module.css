@@ -1,7 +1,7 @@
 .container {
   display: grid;
   height: 100vh;
-  column-gap: .2rem;
+  column-gap: 0.2rem;
   row-gap: 0;
   grid-template-rows: 10vh calc(80vh - 1rem) 10vh 1vh;
   grid-template-columns: 1fr 8fr 1fr;
@@ -74,9 +74,9 @@
 
 .gridContainer {
   display: grid;
-  width: 60vh;
-  height: 60vh;
-  margin: 0 auto 2vh auto;
+  width: 640px;  /* 40 tiles * 16px/tile */
+  height: 400px; /* 25 tiles * 16px/tile */
+  margin: 2rem auto;
   border: 1px solid #ccc;
 }
 
