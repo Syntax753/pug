@@ -72,28 +72,21 @@
   margin-right: .5vh;
 }
 
-.eyes {
-  width: 80%;
-  margin-bottom: 2vh;
-  transition: transform 0.3s ease-in-out;
+.gridContainer {
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  grid-template-rows: repeat(13, 1fr);
+  width: 60vh;
+  height: 60vh;
+  margin: 0 auto 2vh auto;
+  border: 1px solid #ccc;
 }
 
-.eyesState1 {
-  transform: rotate(5deg);
+.gridCell {
+  width: 100%;
+  height: 100%;
 }
 
-.eyesState2 {
-  transform: rotate(-5deg);
-}
-
-.eyesState3 {
-  transform: rotate(3deg);
-}
-
-.eyesState4 {
-  transform: rotate(-3deg);
-}
-
-.eyesState5 {
-  transform: rotate(0deg);
+.grassCell {
+  background-color: #7CFC00; /* lawn green */
 }
