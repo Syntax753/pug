@@ -8,13 +8,22 @@ import ContentButton from '@/components/contentButton/ContentButton';
 import LoadScreen from '@/loadScreen/LoadScreen';
 import TopBar from '@/components/topBar/TopBar';
 import Grid from "./Grid";
+import Persona from "./Persona";
+import Pug from "./Pug";
+import Roach from "./Roach";
 
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 20;
 
-interface Position {
+export interface Position {
   x: number;
   y: number;
+}
+
+export interface Entity {
+  id: number;
+  persona: Persona;
+  position: Position;
 }
 
 function HomeScreen() {
@@ -22,7 +31,6 @@ function HomeScreen() {
   const [prompt, setPrompt] = useState<string>('');
   const [responseText, setResponseText] = useState<string>('');
   const [tileSize, setTileSize] = useState<number>(32);
-  const [playerPosition] = useState<Position>({ x: Math.floor(GRID_WIDTH / 2), y: Math.floor(GRID_HEIGHT / 2) });
   const [grid] = useState<number[][]>(() => {
     const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
     // Add a small pond in the center of the grid
@@ -37,6 +45,11 @@ function HomeScreen() {
     return newGrid;
   });
   
+  const [entities] = useState<Entity[]>([
+    { id: 1, persona: new Pug(), position: { x: 1, y: 1 } },
+    { id: 2, persona: new Roach(), position: { x: 3, y: 3 } },
+  ]);
+
   useEffect(() => {
     if (isLoading) return;
 
@@ -69,7 +82,7 @@ function HomeScreen() {
     <div className={styles.container}>
       <TopBar />
       <div className={styles.content}>
-        <Grid grid={grid} width={GRID_WIDTH} height={GRID_HEIGHT} playerPosition={playerPosition} tileSize={tileSize} />
+        <Grid grid={grid} width={GRID_WIDTH} height={GRID_HEIGHT} entities={entities} tileSize={tileSize} />
         <div className={styles.prompt}>
           <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)} />
           <ContentButton text="Send" onClick={() => submitPrompt(prompt, setPrompt, _onRespond)} />
