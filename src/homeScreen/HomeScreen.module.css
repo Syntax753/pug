@@ -88,5 +88,8 @@
 }
 
 .grassCell {
-  background-color: #7CFC00; /* lawn green */
+  background-image: url('./images/grass.png');
+  background-size: cover;
+  /* This gives the sprite a sharp, pixelated look */
+  image-rendering: pixelated;
 }

@@ -15,7 +15,7 @@ function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [prompt, setPrompt] = useState<string>('');
   const [responseText, setResponseText] = useState<string>('');
-  const [grid, setGrid] = useState<number[][]>(() => Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0)));
+  const [grid] = useState<number[][]>(() => Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0)));
   
   useEffect(() => {
     if (isLoading) return;
