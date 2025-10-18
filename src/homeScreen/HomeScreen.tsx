@@ -55,11 +55,11 @@ function HomeScreen() {
       <TopBar />
       <div className={styles.content}>
         <Grid grid={grid} width={GRID_WIDTH} height={GRID_HEIGHT} />
-      </div>
-      <div className={styles.prompt}>
-        <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)}/>
-        <ContentButton text="Send" onClick={() => submitPrompt(prompt, setPrompt, _onRespond)} /></p>
-        {response}
+        <div className={styles.prompt}>
+          <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)}/>
+          <ContentButton text="Send" onClick={() => submitPrompt(prompt, setPrompt, _onRespond)} /></p>
+          {response}
+        </div>
       </div>
     </div>
   );
