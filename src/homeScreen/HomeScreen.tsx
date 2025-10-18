@@ -23,15 +23,21 @@ function HomeScreen() {
   const [gameLog, setGameLog] = useState<string[]>(['Game started. Press Space to begin.']);
   const [turn, setTurn] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(true);
-  
+
   const [entities] = useState<Entity[]>([
     { id: 1, persona: new Pug(), position: { x: 1, y: 1 } },
     { id: 2, persona: new Roach(), position: { x: 3, y: 3 } },
   ]);
 
-  const [grid] = useState<number[][]>(() => {
+  const [layer0] = useState<number[][]>(() => {
     const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
-    // Place entities on the grid
+    // For now, just fill with 0s. The Grid component will handle tile variations.
+    // You can add more complex terrain generation here later.
+    return newGrid;
+  });
+
+  const [entityGrid] = useState<number[][]>(() => {
+    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
     for (const entity of entities) {
       newGrid[entity.position.y][entity.position.x] = entity.id;
     }
@@ -110,8 +116,9 @@ function HomeScreen() {
           ))}
         </div>
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
-          <Grid grid={grid} width={GRID_WIDTH} height={GRID_HEIGHT} entities={entities} tileSize={tileSize} />
-          <GridData grid={grid} />
+          <Grid layer0={layer0} entityGrid={entityGrid} width={GRID_WIDTH} height={GRID_HEIGHT} tileSize={tileSize} />
+          <GridData grid={layer0} />
+          <GridData grid={entityGrid} />
         </div>
         <div className={styles.prompt}>
           <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)} />
