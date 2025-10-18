@@ -21,7 +21,7 @@ function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [prompt, setPrompt] = useState<string>('');
   const [responseText, setResponseText] = useState<string>('');
-  const [tileSize] = useState<number>(32);
+  const [tileSize, setTileSize] = useState<number>(32);
   const [playerPosition] = useState<Position>({ x: Math.floor(GRID_WIDTH / 2), y: Math.floor(GRID_HEIGHT / 2) });
   const [grid] = useState<number[][]>(() => {
     const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
@@ -55,6 +55,14 @@ function HomeScreen() {
     setResponseText(text);
   }
 
+  function zoomIn() {
+    setTileSize(prevSize => prevSize + 8);
+  }
+
+  function zoomOut() {
+    setTileSize(prevSize => Math.max(16, prevSize - 8)); // Don't allow zooming out smaller than 16px
+  }
+
   const response = responseText === GENERATING ? <p>hmmm<WaitingEllipsis/></p> : <p>{responseText}</p>
   
   return (
@@ -63,8 +71,10 @@ function HomeScreen() {
       <div className={styles.content}>
         <Grid grid={grid} width={GRID_WIDTH} height={GRID_HEIGHT} playerPosition={playerPosition} tileSize={tileSize} />
         <div className={styles.prompt}>
-          <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)}/>
-          <ContentButton text="Send" onClick={() => submitPrompt(prompt, setPrompt, _onRespond)} /></p>
+          <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)} />
+          <ContentButton text="Send" onClick={() => submitPrompt(prompt, setPrompt, _onRespond)} />
+          <ContentButton text="Zoom In" onClick={zoomIn} />
+          <ContentButton text="Zoom Out" onClick={zoomOut} /></p>
           {response}
         </div>
       </div>
