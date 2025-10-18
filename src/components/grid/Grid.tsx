@@ -1,4 +1,5 @@
-import grassImage from '@/assets/layer0/tile_1.png';
+import grassImage1 from '@/assets/layer0/tile_1.png';
+import grassImage6 from '@/assets/layer0/tile_6.png';
 import styles from '@/homeScreen/HomeScreen.module.css';
 import Pug from '@/persona/impl/Pug';
 import Roach from '@/persona/impl/Roach';
@@ -15,7 +16,8 @@ const pug = new Pug();
 const roach = new Roach();
 
 const tileMapping: { [key: number]: string | undefined } = {
-  0: grassImage,
+  1: grassImage1,
+  6: grassImage6,
 };
 
 const entityMapping: { [key: number]: string | undefined } = {
@@ -35,7 +37,7 @@ function Grid({ layer0, entityGrid, width, height, tileSize }: GridProps) {
     <div className={styles.gridContainer} style={gridStyle}>
       {layer0.map((row, rowIndex) => (
         row.map((_, colIndex) => {
-          const baseTileImage = tileMapping[0]; // Always render grass as the base
+          const baseTileImage = tileMapping[layer0[rowIndex][colIndex]];
           const entityValue = entityGrid[rowIndex][colIndex];
           const entityImage = entityMapping[entityValue];
 

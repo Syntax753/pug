@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import WaitingEllipsis from '@/components/waitingEllipsis/WaitingEllipsis';
 import ContentButton from '@/components/contentButton/ContentButton';
@@ -15,6 +15,26 @@ import Roach from '@/persona/impl/Roach';
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 20;
 
+// Simple noise function to create clusters
+function simpleNoise(x: number, y: number, seed: number = 0): number {
+  const n = x + y * 57 + seed;
+  const x1 = (n << 13) ^ n;
+  // Return a value between 0 and 1
+  return (1.0 - ((x1 * (x1 * x1 * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0);
+}
+
+function loadGrid(width: number, height: number, seed: number): number[][] {
+  const newGrid = Array(height).fill(0).map(() => Array(width).fill(0));
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const scale = 0.2;
+      const noiseValue = simpleNoise(x * scale, y * scale, seed);
+      newGrid[y][x] = noiseValue > 0.5 ? 1 : 6;
+    }
+  }
+  return newGrid;
+}
+
 function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [prompt, setPrompt] = useState<string>('');
@@ -29,11 +49,11 @@ function HomeScreen() {
     { id: 2, persona: new Roach(), position: { x: 3, y: 3 } },
   ]);
 
+  // Generate a random seed once per component instance to vary the grass pattern
+  const seed = useMemo(() => Math.random() * 1000, []);
+
   const [layer0] = useState<number[][]>(() => {
-    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
-    // For now, just fill with 0s. The Grid component will handle tile variations.
-    // You can add more complex terrain generation here later.
-    return newGrid;
+    return loadGrid(GRID_WIDTH, GRID_HEIGHT, seed);
   });
 
   const [entityGrid] = useState<number[][]>(() => {
