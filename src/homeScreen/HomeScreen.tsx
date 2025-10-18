@@ -9,8 +9,8 @@ import LoadScreen from '@/loadScreen/LoadScreen';
 import TopBar from '@/components/topBar/TopBar';
 import Grid from "./Grid";
 
-const GRID_WIDTH = 40;
-const GRID_HEIGHT = 25;
+const GRID_WIDTH = 20;
+const GRID_HEIGHT = 20;
 
 function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -21,10 +21,12 @@ function HomeScreen() {
     // Add a small pond in the center of the grid
     const centerX = Math.floor(GRID_WIDTH / 2);
     const centerY = Math.floor(GRID_HEIGHT / 2);
-    newGrid[centerY][centerX] = 1;
-    newGrid[centerY][centerX + 1] = 1;
-    newGrid[centerY - 1][centerX + 1] = 1;
-    newGrid[centerY][centerX + 2] = 1;
+
+    // Safely create a small pond, ensuring it's within grid bounds
+    if (GRID_HEIGHT > 1 && GRID_WIDTH > 3) {
+      newGrid[centerY][centerX] = 1;
+      newGrid[centerY - 1][centerX + 1] = 1;
+    }
     return newGrid;
   });
   

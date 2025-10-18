@@ -13,10 +13,14 @@ const cellTypeMapping: { [key: number]: string | undefined } = {
   1: waterImage,
 };
 
+const TILE_SIZE = 16; // Each tile is 16x16 pixels
+
 function Grid({ grid, width, height }: GridProps) {
   const gridStyle = {
     gridTemplateColumns: `repeat(${width}, 1fr)`,
     gridTemplateRows: `repeat(${height}, 1fr)`,
+    width: `${width * TILE_SIZE}px`,
+    height: `${height * TILE_SIZE}px`,
   };
 
   return (

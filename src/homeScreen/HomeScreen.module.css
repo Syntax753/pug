@@ -74,8 +74,6 @@
 
 .gridContainer {
   display: grid;
-  width: 640px;  /* 40 tiles * 16px/tile */
-  height: 400px; /* 25 tiles * 16px/tile */
   margin: 2rem auto;
   border: 1px solid #ccc;
 }
