@@ -1,7 +1,7 @@
 import styles from './HomeScreen.module.css';
 import grassImage from '@/assets/layer0/tile_1.png';
 import waterImage from '@/assets/layer0/tile_162.png';
-import playerImage from '@/assets/persona/pug.jpg';
+import playerImage from '@/assets/persona/pug.png';
 
 interface Position {
   x: number;

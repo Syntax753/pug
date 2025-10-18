@@ -29,6 +29,7 @@
 .gridContainer {
   display: grid;
   border: 1px solid #ccc;
+  transition: width 0.3s ease, height 0.3s ease;
 }
 
 .gridCell {
