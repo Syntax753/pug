@@ -1,5 +1,5 @@
-import LLMMessage from "./types/LLMMessage";
-import LLMMessages from "./types/LLMMessages";
+import LLMMessage from '@/llm/types/LLMMessage';
+import LLMMessages from '@/llm/types/LLMMessages';
 
 let toolCallId = 0;
 

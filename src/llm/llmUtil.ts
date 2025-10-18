@@ -11,13 +11,13 @@
 
 import { updateModelDeviceLoadHistory, updateModelDevicePerformanceHistory } from "decent-portal";
 
-import LLMConnection from "./types/LLMConnection";
-import LLMConnectionState from "./types/LLMConnectionState";
-import LLMConnectionType from "./types/LLMConnectionType";
-import LLMMessages from "./types/LLMMessages";
-import StatusUpdateCallback from "./types/StatusUpdateCallback";
-import { webLlmConnect, webLlmGenerate } from "./webLlmUtil";
-import { getCachedPromptResponse, setCachedPromptResponse } from "./promptCache";
+import LLMConnection from '@/llm/types/LLMConnection';
+import LLMConnectionState from '@/llm/types/LLMConnectionState';
+import LLMConnectionType from '@/llm/types/LLMConnectionType';
+import LLMMessages from '@/llm/types/LLMMessages';
+import StatusUpdateCallback from '@/llm/types/StatusUpdateCallback';
+import { webLlmConnect, webLlmGenerate } from '@/llm/webLlmUtil';
+import { getCachedPromptResponse, setCachedPromptResponse } from '@/llm/promptCache';
 
 const UNSPECIFIED_MODEL_ID = 'UNSPECIFIED';
 

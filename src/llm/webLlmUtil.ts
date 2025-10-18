@@ -1,16 +1,15 @@
-import LLMConnection from "./types/LLMConnection";
-import LLMConnectionType from "./types/LLMConnectionType";
-import LLMMessages from "./types/LLMMessages";
-import StatusUpdateCallback from "./types/StatusUpdateCallback";
-
-import { addAssistantMessageToChatHistory, addUserMessageToChatHistory, createChatHistory } from "./messageUtil";
+import LLMConnection from '@/llm/types/LLMConnection';
+import LLMConnectionType from '@/llm/types/LLMConnectionType';
+import LLMMessages from '@/llm/types/LLMMessages';
+import StatusUpdateCallback from '@/llm/types/StatusUpdateCallback';
+import { addAssistantMessageToChatHistory, addUserMessageToChatHistory, createChatHistory } from '@/llm/messageUtil';
 
 import {
   CreateMLCEngine,
   ChatCompletionRequest,
   ChatCompletionMessageParam,
 } from "@mlc-ai/web-llm";
-import LLMMessage from "./types/LLMMessage";
+import LLMMessage from '@/llm/types/LLMMessage';
 
 // A safe way to convert from WebLLM-specific message format to the format used by the chat history. The two formats are the same as I write this, 
 // but this function should catch breakages if the WebLLM format changes.

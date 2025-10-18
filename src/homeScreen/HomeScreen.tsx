@@ -1,36 +1,27 @@
 import { useEffect, useState } from "react";
 
 import WaitingEllipsis from '@/components/waitingEllipsis/WaitingEllipsis';
-import styles from './HomeScreen.module.css';
-import { init } from "./interactions/initialization";
-import { GENERATING, submitPrompt } from "./interactions/prompt";
 import ContentButton from '@/components/contentButton/ContentButton';
 import LoadScreen from '@/loadScreen/LoadScreen';
 import TopBar from '@/components/topBar/TopBar';
-import Grid from "./Grid";
-import Persona from "./Persona";
-import Pug from "./Pug";
-import Roach from "./Roach";
+import Grid from '@/homeScreen/Grid';
+import { init } from '@/homeScreen/interactions/initialization';
+import { GENERATING, submitPrompt } from '@/homeScreen/interactions/prompt';
+import { Entity } from '@/persona/types';
+import styles from '@/homeScreen/HomeScreen.module.css';
+import Pug from '@/persona/impl/Pug';
+import Roach from '@/persona/impl/Roach';
 
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 20;
-
-export interface Position {
-  x: number;
-  y: number;
-}
-
-export interface Entity {
-  id: number;
-  persona: Persona;
-  position: Position;
-}
 
 function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [prompt, setPrompt] = useState<string>('');
   const [responseText, setResponseText] = useState<string>('');
   const [tileSize, setTileSize] = useState<number>(32);
+  const [gameLog, setGameLog] = useState<string[]>(['Game started.']);
+  const [turn, setTurn] = useState<number>(0);
   const [grid] = useState<number[][]>(() => {
     const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
     // Add a small pond in the center of the grid
@@ -56,6 +47,32 @@ function HomeScreen() {
     init().then(isLlmConnected => { 
       if (!isLlmConnected) setIsLoading(true);
     });
+
+    // Game Loop
+    const gameLoop = () => {
+      const newLog: string[] = [];
+      newLog.push(`Starting Turn ${turn + 1}`);
+
+      // First pass: Player
+      for (const entity of entities) {
+        if (entity.persona.isPlayer) {
+          newLog.push("Your move");
+        }
+      }
+
+      // Second pass: Enemies
+      for (const entity of entities) {
+        if (!entity.persona.isPlayer) {
+          newLog.push(`${entity.persona.constructor.name} to move`);
+        }
+      }
+
+      setGameLog(prevLog => [...prevLog, ...newLog].slice(-10)); // Keep last 10 messages
+      setTurn(t => t + 1);
+    };
+
+    const timerId = setTimeout(gameLoop, 2000); // Run loop every 2 seconds
+    return () => clearTimeout(timerId);
   }, [isLoading]);
 
   if (isLoading) return <LoadScreen onComplete={() => setIsLoading(false)} />;
@@ -82,6 +99,11 @@ function HomeScreen() {
     <div className={styles.container}>
       <TopBar />
       <div className={styles.content}>
+        <div className={styles.notificationArea}>
+          {gameLog.map((msg, index) => (
+            <p key={index}>{msg}</p>
+          ))}
+        </div>
         <Grid grid={grid} width={GRID_WIDTH} height={GRID_HEIGHT} entities={entities} tileSize={tileSize} />
         <div className={styles.prompt}>
           <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)} />

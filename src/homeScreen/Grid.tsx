@@ -1,7 +1,7 @@
-import styles from './HomeScreen.module.css';
 import grassImage from '@/assets/layer0/tile_1.png';
 import waterImage from '@/assets/layer0/tile_162.png';
-import { Entity } from './HomeScreen';
+import styles from '@/homeScreen/HomeScreen.module.css';
+import { Entity } from '@/persona/types';
 
 interface GridProps {
   grid: number[][];
