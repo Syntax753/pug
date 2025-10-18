@@ -5,7 +5,6 @@ import ContentButton from '@/components/contentButton/ContentButton';
 import LoadScreen from '@/loadScreen/LoadScreen';
 import TopBar from '@/components/topBar/TopBar';
 import Grid from '@/homeScreen/Grid';
-import { init } from '@/homeScreen/interactions/initialization';
 import { GENERATING, submitPrompt } from '@/homeScreen/interactions/prompt';
 import { Entity } from '@/persona/types';
 import styles from '@/homeScreen/HomeScreen.module.css';
@@ -16,12 +15,13 @@ const GRID_WIDTH = 20;
 const GRID_HEIGHT = 20;
 
 function HomeScreen() {
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [prompt, setPrompt] = useState<string>('');
   const [responseText, setResponseText] = useState<string>('');
   const [tileSize, setTileSize] = useState<number>(32);
-  const [gameLog, setGameLog] = useState<string[]>(['Game started.']);
+  const [gameLog, setGameLog] = useState<string[]>(['Game started. Press Space to begin.']);
   const [turn, setTurn] = useState<number>(0);
+  const [isPaused, setIsPaused] = useState<boolean>(true);
   const [grid] = useState<number[][]>(() => {
     const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
     // Add a small pond in the center of the grid
@@ -42,11 +42,7 @@ function HomeScreen() {
   ]);
 
   useEffect(() => {
-    if (isLoading) return;
-
-    init().then(isLlmConnected => { 
-      if (!isLlmConnected) setIsLoading(true);
-    });
+    if (isLoading || isPaused) return;
 
     // Game Loop
     const gameLoop = () => {
@@ -67,13 +63,25 @@ function HomeScreen() {
         }
       }
 
-      setGameLog(prevLog => [...prevLog, ...newLog].slice(-10)); // Keep last 10 messages
+      newLog.push("Hit Space to continue");
+      setGameLog(prevLog => [...prevLog, ...newLog].slice(-10));
       setTurn(t => t + 1);
+      setIsPaused(true);
     };
 
     const timerId = setTimeout(gameLoop, 2000); // Run loop every 2 seconds
     return () => clearTimeout(timerId);
-  }, [isLoading]);
+  }, [isLoading, isPaused, entities, turn]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && isPaused) {
+        setIsPaused(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPaused]);
 
   if (isLoading) return <LoadScreen onComplete={() => setIsLoading(false)} />;
 
