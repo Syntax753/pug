@@ -9,21 +9,22 @@ import LoadScreen from '@/loadScreen/LoadScreen';
 import TopBar from '@/components/topBar/TopBar';
 import Grid from "./Grid";
 
-const GRID_SIZE = 13;
+const GRID_WIDTH = 20;
+const GRID_HEIGHT = 20;
 
 function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [prompt, setPrompt] = useState<string>('');
   const [responseText, setResponseText] = useState<string>('');
   const [grid] = useState<number[][]>(() => {
-    const newGrid = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
-    // Let's add a small pond
-    newGrid[5][5] = 1;
-    newGrid[5][6] = 1;
-    newGrid[6][5] = 1;
-    newGrid[6][6] = 1;
-    newGrid[6][7] = 1;
-    newGrid[7][6] = 1;
+    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
+    // Add a small pond in the center of the grid
+    const centerX = Math.floor(GRID_WIDTH / 2);
+    const centerY = Math.floor(GRID_HEIGHT / 2);
+    newGrid[centerY][centerX] = 1;
+    newGrid[centerY][centerX + 1] = 1;
+    newGrid[centerY - 1][centerX + 1] = 1;
+    newGrid[centerY][centerX + 2] = 1;
     return newGrid;
   });
   
@@ -51,10 +52,12 @@ function HomeScreen() {
     <div className={styles.container}>
       <TopBar />
       <div className={styles.content}>
-        <Grid grid={grid} />
-        <p><input type="text" className={styles.promptBox} placeholder="Say anything to this screen" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)}/>
-        <ContentButton text="Send" onClick={() => submitPrompt(prompt, setPrompt, _onRespond)} /></p>
-        {response}
+        <Grid grid={grid} width={GRID_WIDTH} height={GRID_HEIGHT} />
+        <div>
+          <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)}/>
+          <ContentButton text="Send" onClick={() => submitPrompt(prompt, setPrompt, _onRespond)} /></p>
+          {response}
+        </div>
       </div>
     </div>
   );
