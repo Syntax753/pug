@@ -7,7 +7,7 @@ import TopBar from '@/components/topBar/TopBar';
 import Grid from '@/components/grid/Grid';
 import GridData from '@/components/gridData/GridData';
 import { GENERATING, submitPrompt } from '@/homeScreen/interactions/prompt';
-import { Entity } from '@/persona/types';
+import { Entity, Position } from '@/persona/types';
 import styles from '@/homeScreen/HomeScreen.module.css';
 import Pug from '@/persona/impl/Pug';
 import Roach from '@/persona/impl/Roach';
@@ -49,11 +49,17 @@ function HomeScreen() {
   const [gameLog, setGameLog] = useState<string[]>(['Game started. Press Space to begin.']);
   const [turn, setTurn] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(true);
+  const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
 
-  const [entities] = useState<Entity[]>([
+  const [entities, setEntities] = useState<Entity[]>([
     { id: 1, persona: new Pug(), position: { x: 1, y: 1 } },
     { id: 2, persona: new Roach(), position: { x: 3, y: 3 } },
   ]);
+
+  const [entityGrid, setEntityGrid] = useState<number[][]>(() => {
+    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
+    return newGrid;
+  });
 
   // Generate a random seed once per component instance to vary the grass pattern
   const seed = useMemo(() => Math.random() * 1000, []);
@@ -62,55 +68,125 @@ function HomeScreen() {
     return loadGrid(GRID_WIDTH, GRID_HEIGHT, seed);
   });
 
-  const [entityGrid] = useState<number[][]>(() => {
+  // This effect synchronizes the entityGrid with the entities' positions
+  useEffect(() => {
     const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
     for (const entity of entities) {
       newGrid[entity.position.y][entity.position.x] = entity.id;
     }
-    return newGrid;
-  });
+    setEntityGrid(newGrid);
+  }, [entities]);
 
   useEffect(() => {
     if (isLoading || isPaused) return;
 
     // Game Loop
-    const gameLoop = () => {
+    const runGameTurn = () => {
       const newLog: string[] = [];
       newLog.push(`Starting Turn ${turn + 1}`);
-
-      // First pass: Player
-      for (const entity of entities) {
-        if (entity.persona.isPlayer) {
-          newLog.push("Your move");
-        }
-      }
-
-      // Second pass: Enemies
-      for (const entity of entities) {
-        if (!entity.persona.isPlayer) {
-          newLog.push(`${entity.persona.constructor.name} to move`);
-        }
-      }
-
-      newLog.push("Hit Space to continue");
       setGameLog(prevLog => [...prevLog, ...newLog].slice(-10));
-      setTurn(t => t + 1);
-      setIsPaused(true);
+
+      // Player's turn
+      setAwaitingPlayerInput(true);
+      // The rest of the turn logic will be triggered by player input in the other useEffect
     };
 
-    const timerId = setTimeout(gameLoop, 2000); // Run loop every 2 seconds
-    return () => clearTimeout(timerId);
-  }, [isLoading, isPaused, entities, turn]);
+    runGameTurn();
+    // The main game loop is now event-driven by player input, so no timeout is needed here.
+  }, [isLoading, isPaused, turn]);
+
+  const handlePlayerMove = (newPosition: Position) => {
+    if (!awaitingPlayerInput) return;
+
+    setAwaitingPlayerInput(false);
+
+    const intendedMoves: { entity: Entity, newPosition: Position }[] = [];
+    const newLog: string[] = [];
+
+    // 1. Calculate Player's intended move
+    const player = entities.find(e => e.persona.isPlayer);
+    if (player) {
+      intendedMoves.push({ entity: player, newPosition });
+      newLog.push(`Player intends to move to (${newPosition.x}, ${newPosition.y})`);
+    }
+
+    // 2. Calculate NPCs' intended moves
+    const playerPosition = player?.position;
+    for (const entity of entities) {
+      if (!entity.persona.isPlayer && playerPosition) {
+        let { x, y } = entity.position;
+        const dx = playerPosition.x - x;
+        const dy = playerPosition.y - y;
+
+        // Roach AI: prefer vertical movement
+        if (dy !== 0) {
+          y += Math.sign(dy);
+        } else if (dx !== 0) {
+          x += Math.sign(dx);
+        }
+
+        const npcNewPosition = { x, y };
+        intendedMoves.push({ entity, newPosition: npcNewPosition });
+        newLog.push(`${entity.persona.constructor.name} intends to move to (${npcNewPosition.x}, ${npcNewPosition.y})`);
+      }
+    }
+
+    // 3. Apply all moves simultaneously
+    setEntities(prevEntities => {
+      return prevEntities.map(e => {
+        const move = intendedMoves.find(m => m.entity.id === e.id);
+        if (move) {
+          // Basic boundary check
+          if (
+            move.newPosition.x >= 0 && move.newPosition.x < GRID_WIDTH &&
+            move.newPosition.y >= 0 && move.newPosition.y < GRID_HEIGHT
+          ) {
+            return { ...e, position: move.newPosition };
+          }
+        }
+        return e;
+      });
+    });
+
+    // 4. Log results and end turn
+    newLog.push("Hit Space to continue");
+    setGameLog(prevLog => [...prevLog, ...newLog].slice(-10));
+    setTurn(t => t + 1);
+    setIsPaused(true);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && isPaused) {
+      if (e.code === 'Space' && isPaused && !awaitingPlayerInput) {
         setIsPaused(false);
+        return;
+      }
+
+      if (awaitingPlayerInput) {
+        const player = entities.find(e => e.persona.isPlayer);
+        if (!player) return;
+
+        let { x, y } = player.position;
+        if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') y--;
+        else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') y++;
+        else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') x--;
+        else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') x++;
+        else return; // Not a movement key
+
+        handlePlayerMove({ x, y });
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPaused]);
+  }, [isPaused, awaitingPlayerInput, entities]);
+
+  useEffect(() => {
+    if (awaitingPlayerInput) {
+      const newLog = ["Your move (use arrows or WASD)"];
+      setGameLog(prevLog => [...prevLog, ...newLog].slice(-10));
+    }
+  }, [awaitingPlayerInput]);
 
   if (isLoading) return <LoadScreen onComplete={() => setIsLoading(false)} />;
 
