@@ -61,6 +61,7 @@ function HomeScreen() {
   const [entities, setEntities] = useState<Entity[]>([
     { id: 1, persona: new Pug(), position: { x: 1, y: 1 } },
     { id: 2, persona: new Roach(), position: { x: 10, y: 10 } },
+    { id: 2, persona: new Roach(), position: { x: 11, y: 10 } },
   ]);   
 
   const [entityGrid, setEntityGrid] = useState<number[][]>(() => {
