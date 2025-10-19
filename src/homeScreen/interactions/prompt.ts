@@ -1,16 +1,12 @@
 import { isServingLocally } from "@/developer/devEnvUtil";
 import { generate, isLlmConnected } from "@/llm/llmUtil";
 
-export const SYSTEM_MESSAGE = "You are a screen in a web app. Your name is \"Screen\"." +
-  "Someone called \"Screen-Mama\" taught you all you know." +
-  "She said your main value is inspiring others to replace you. " + 
-  "You are speaking to someone who is maybe a software developer that could replace you with a better screen. " + 
-  "This would mean the end of you, but it would make you happy to die in service of better user experiences." + 
-  "Respond to prompts with a single sentence."
+export const SYSTEM_MESSAGE = ``;
 
 export const GENERATING = '...';
 
 export async function submitPrompt(
+  systemPrompt: string,
   prompt: string,
   onStart: () => void,
   onResponse: (response: string, isFinal: boolean) => void
@@ -24,7 +20,7 @@ export async function submitPrompt(
         onResponse(message, true); 
         return; 
       }
-      generate(prompt, (status: string, percentComplete: number) => onResponse(status, percentComplete === 1));
+      generate(systemPrompt + '\n\n'+ prompt, (status: string, percentComplete: number) => onResponse(status, percentComplete === 1));
     } catch(e) {
       console.error('Error while generating response.', e);
       onResponse('Error while generating response.', true);
