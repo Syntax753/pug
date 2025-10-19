@@ -9,7 +9,7 @@ And all dogs love - puzzles on a grid
 
 *High-spec or GPU based machine advisable for better experience*
 
-*The first time AISSH is run, AISSH will embed a Llama-3.1-8B model in the browser. This is a substantial download so will take a while*
+*The first time pug is run, pug will embed a Llama-3.1-8B model in the browser. This is a substantial download so will take a while*
 
 Subsequent runs will use the cached LLM and so load much faster (~10-15 seconds).
 
