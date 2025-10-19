@@ -47,7 +47,8 @@ function getCurrentTime(): string {
   const now = new Date();
   const hours = now.getHours().toString().padStart(2, '0');
   const minutes = now.getMinutes().toString().padStart(2, '0');
-  return `${hours}:${minutes}`;
+  const seconds = now.getSeconds().toString().padStart(2, '0');
+  return `${hours}:${minutes}:${seconds}`;
 }
 
 function HomeScreen() {
@@ -149,10 +150,10 @@ function HomeScreen() {
       setGameLog(prev => [`${getCurrentTime()} Response from LLM: ${direction}`, ...prev].slice(0, 100));
 
       // Translate direction to position change
-      if (direction.toLowerCase().includes('up')) y--;
-      else if (direction.toLowerCase().includes('down')) y++;
-      else if (direction.toLowerCase().includes('left')) x--;
-      else if (direction.toLowerCase().includes('right')) x++;
+      if (direction.toLowerCase().includes(' up ')) y--;
+      else if (direction.toLowerCase().includes(' down ')) y++;
+      else if (direction.toLowerCase().includes(' left ')) x--;
+      else if (direction.toLowerCase().includes(' right ')) x++;
       setGameLog(prev => [`${getCurrentTime()} ${npc.type} intends to move: ${direction}`, ...prev].slice(0, 100));
 
       intendedMoves.push({ entity: npc, newPosition: { x, y } });
@@ -256,7 +257,7 @@ function HomeScreen() {
             <ContentButton text="Zoom Out" onClick={zoomOut} /></p>
             {response}
           </div>
-          <div className={styles.notificationArea} style={{ minHeight: '10em' }}>
+          <div className={styles.notificationArea} style={{ height: '10em', overflowY: 'auto' }}>
             {gameLog.map((msg, index) => (
               <p
                 key={index}
