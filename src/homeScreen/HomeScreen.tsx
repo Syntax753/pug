@@ -91,10 +91,7 @@ function HomeScreen() {
 
     // Game Loop
     const runGameTurn = () => {
-      const newLog: string[] = [`Start turn ${turn + 1}`];
-      newLog.push(`Awaiting player move`);
-      setGameLog(newLog);
-
+      setGameLog(prev => [`Awaiting player move (use arrows or WASD)`, `Start turn ${turn + 1}`, ...prev].slice(0, 100));
       // Player's turn
       setAwaitingPlayerInput(true);
       // The rest of the turn logic will be triggered by player input in the other useEffect
@@ -107,49 +104,42 @@ function HomeScreen() {
   const executeTurn = async (playerDirection: 'up' | 'down' | 'left' | 'right') => {
     setAwaitingPlayerInput(false);
     const intendedMoves: { entity: Entity, newPosition: Position }[] = [];
-    const turnLog: string[] = [`Start turn ${turn + 1}`];
-    setGameLog(turnLog);
-    
-    const playerPosition = entities.find(e => e.type === 'pug')?.position;
-    if (!playerPosition) return;
+    setGameLog(prev => [`Player intends to move ${playerDirection}`, ...prev].slice(0, 100));
 
-    const movePromises = entities.map(async (entity) => {
-      let { x, y } = entity.position;
-      
-      if (entity.type === 'pug') {
-        setGameLog(prev => [...prev, `Player intends to move ${playerDirection}`]);
-        if (playerDirection === 'up') y--;
-        else if (playerDirection === 'down') y++;
-        else if (playerDirection === 'left') x--;
-        else if (playerDirection === 'right') x++;
-        return { entity, newPosition: { x, y } };
-      }
+    // 1. Calculate player's intended move
+    const player = entities.find(e => e.type === 'pug');
+    if (!player) return;
+    let { x: playerX, y: playerY } = player.position;
+    if (playerDirection === 'up') playerY--;
+    else if (playerDirection === 'down') playerY++;
+    else if (playerDirection === 'left') playerX--;
+    else if (playerDirection === 'right') playerX++;
+    intendedMoves.push({ entity: player, newPosition: { x: playerX, y: playerY } });
 
-      if (entity.type === 'roach') {
-        setGameLog(prev => [...prev, `Awaiting roach move`]);
-        
-        // LLM-driven movement
-        const userPrompt = `${entity.persona.goal}\n${entity.persona.prompt}\nYour coordinates are (${entity.position.x}, ${entity.position.y}). The player's coordinates are (${playerPosition.x}, ${playerPosition.y}).\nWhich direction should I move?`;
-        console.log(userPrompt);
-        setGameLog(prev => [...prev, `Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`]);
-        const direction = await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt);
-        setGameLog(prev => [...prev, `Response from LLM: ${direction}`]);
+    // 2. Calculate roach moves sequentially
+    const roaches = entities.filter(e => e.type === 'roach').sort((a, b) => a.id - b.id);
+    const playerPosition = player.position;
 
-        // Translate direction to position change
-        if (direction.toLowerCase().includes('up')) y--;
-        else if (direction.toLowerCase().includes('down')) y++;
-        else if (direction.toLowerCase().includes('left')) x--;
-        else if (direction.toLowerCase().includes('right')) x++;
-        setGameLog(prev => [...prev, `Roach intends to move ${direction}`]);
+    for (const roach of roaches) {
+      setGameLog(prev => [`Awaiting roach move...`, ...prev].slice(0, 100));
+      let { x, y } = roach.position;
 
-        return { entity, newPosition: { x, y } };
-      }
+      // LLM-driven movement
+      const userPrompt = `${roach.persona.goal}\n${roach.persona.prompt}\nYour coordinates are (${roach.position.x}, ${roach.position.y}). The player's coordinates are (${playerPosition.x}, ${playerPosition.y}).\nWhich direction should I move?`;
+      console.log(userPrompt);
+      setGameLog(prev => [`Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`, ...prev].slice(0, 100));
+      const direction = await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt);
+      setGameLog(prev => [`Response from LLM: ${direction}`, ...prev].slice(0, 100));
 
-      return { entity, newPosition: entity.position }; // No move for unknown types
-    });
+      // Translate direction to position change
+      if (direction.toLowerCase().includes('up')) y--;
+      else if (direction.toLowerCase().includes('down')) y++;
+      else if (direction.toLowerCase().includes('left')) x--;
+      else if (direction.toLowerCase().includes('right')) x++;
+      setGameLog(prev => [`Roach intends to move ${direction}`, ...prev].slice(0, 100));
 
-    const allMoves = await Promise.all(movePromises);
-    intendedMoves.push(...allMoves);
+      intendedMoves.push({ entity: roach, newPosition: { x, y } });
+    }
 
     // 3. Apply all moves simultaneously
     setEntities(prevEntities => {
