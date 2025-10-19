@@ -4,7 +4,7 @@ import WaitingEllipsis from '@/components/waitingEllipsis/WaitingEllipsis';
 import ContentButton from '@/components/contentButton/ContentButton';
 import LoadScreen from '@/loadScreen/LoadScreen';
 import TopBar from '@/components/topBar/TopBar';
-import Grid from '@/components/grid/Grid';
+import Grid from '@/components/grid/Grid'; // This line is already correct
 import GridData from '@/components/gridData/GridData';
 import { GENERATING, submitPrompt } from '@/homeScreen/interactions/prompt';
 import { Entity, Position } from '@/persona/types';
