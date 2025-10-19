@@ -51,6 +51,14 @@ function HomeScreen() {
   const [isPaused, setIsPaused] = useState<boolean>(true);
   const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
 
+  const [isDebug, setIsDebug] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Check for debug mode in URL params on initial load
+    const params = new URLSearchParams(window.location.search);
+    setIsDebug(params.get('debug') === 'true');
+  }, []);
+
   const [entities, setEntities] = useState<Entity[]>([
     { id: 1, persona: new Pug(), position: { x: 1, y: 1 } },
     { id: 2, persona: new Roach(), position: { x: 3, y: 3 } },
@@ -219,8 +227,12 @@ function HomeScreen() {
         </div>
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
           <Grid layer0={layer0} entityGrid={entityGrid} width={GRID_WIDTH} height={GRID_HEIGHT} tileSize={tileSize} />
-          <GridData grid={layer0} />
-          <GridData grid={entityGrid} />
+          {isDebug && (
+            <>
+              <GridData grid={layer0} />
+              <GridData grid={entityGrid} />
+            </>
+          )}
         </div>
         <div className={styles.prompt}>
           <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)} />
