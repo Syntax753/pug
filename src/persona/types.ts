@@ -1,4 +1,4 @@
-import Persona from '@/personas/Persona';
+import Persona from '@/persona/Persona';
 
 export interface Position {
   x: number;
