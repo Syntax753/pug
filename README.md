@@ -30,6 +30,13 @@ This opens up AI development to all (for free)!
 
 https://github.com/erikh2000/create-decent-app
 
+### AI Generation
+
+The player sprites (pug and monsters) are AI-generated.
+
+The background sprites are from
+https://feuniverse.us/t/updated-fort-tileset/9288
+
 ## Licensing
 
 MIT
