@@ -111,35 +111,39 @@ function HomeScreen() {
     setGameLog(turnLog);
 
     // 1. Calculate Player's intended move
-    const player = entities.find(e => e.persona.isPlayer);
-    if (player) {
-      intendedMoves.push({ entity: player, newPosition: playerMove });
+    const playerEntity = entities.find(e => e.persona.isPlayer);
+    if (playerEntity) {
+      intendedMoves.push({ entity: playerEntity, newPosition: playerMove });
     }
 
     // 2. Calculate NPCs' intended moves
-    const playerPosition = player?.position;
-    for (const entity of entities) {
-      if (!entity.persona.isPlayer && playerPosition) {
-        setGameLog(prev => [...prev, `Awaiting roach move`]);
-        let { x, y } = entity.position;
+    const playerPosition = playerEntity?.position;
+    const npcEntities = entities.filter(e => !e.persona.isPlayer);
 
-        // LLM-driven movement
-        const userPrompt = `${entity.persona.goal}\n${entity.persona.prompt}\nMy coordinates are (${entity.position.x}, ${entity.position.y}). The player's coordinates are (${playerPosition.x}, ${playerPosition.y}).\nWhich direction should I move?`;
-        setGameLog(prev => [...prev, `Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`]);
-        const direction = await getLLMNavigatorMove(userPrompt);
-        setGameLog(prev => [...prev, `Response from LLM: ${direction}`]);
+    const npcMovePromises = npcEntities.map(async (entity) => {
+      if (!playerPosition) return null;
 
-        // Translate direction to position change
-        if (direction.toLowerCase().includes('up')) y--;
-        else if (direction.toLowerCase().includes('down')) y++;
-        else if (direction.toLowerCase().includes('left')) x--;
-        else if (direction.toLowerCase().includes('right')) x++;
-        setGameLog(prev => [...prev, `Roach intends to move ${direction}`]);
+      setGameLog(prev => [...prev, `Awaiting roach move`]);
+      let { x, y } = entity.position;
 
-        const npcNewPosition = { x, y };
-        intendedMoves.push({ entity, newPosition: npcNewPosition });
-      }
-    }
+      // LLM-driven movement
+      const userPrompt = `${entity.persona.goal}\n${entity.persona.prompt}\nMy coordinates are (${entity.position.x}, ${entity.position.y}). The player's coordinates are (${playerPosition.x}, ${playerPosition.y}).\nWhich direction should I move?`;
+      setGameLog(prev => [...prev, `Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`]);
+      const direction = await getLLMNavigatorMove(userPrompt);
+      setGameLog(prev => [...prev, `Response from LLM: ${direction}`]);
+
+      // Translate direction to position change
+      if (direction.toLowerCase().includes('up')) y--;
+      else if (direction.toLowerCase().includes('down')) y++;
+      else if (direction.toLowerCase().includes('left')) x--;
+      else if (direction.toLowerCase().includes('right')) x++;
+      setGameLog(prev => [...prev, `Roach intends to move ${direction}`]);
+
+      return { entity, newPosition: { x, y } };
+    });
+
+    const npcMoves = (await Promise.all(npcMovePromises)).filter(move => move !== null);
+    intendedMoves.push(...npcMoves as { entity: Entity; newPosition: Position; }[]);
 
     // 3. Apply all moves simultaneously
     setEntities(prevEntities => {
