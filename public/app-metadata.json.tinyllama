@@ -3,6 +3,6 @@
   "name":"pug: puzzles on a grid",
   "description":"A small game where you guide a pug through grid-based puzzles against enemies controlled by AI",
   "supportedModels":[
-    {"id":"Llama-3.1-8B-Instruct-q4f16_1-MLC-1k","appBehaviorSummary":"2025 Decent default model"}
+    {"id":"TinyLlama-1.1B-Chat-v0.4-q4f16_1-MLC","appBehaviorSummary":"Small and fast"}
   ]
 }
