@@ -130,7 +130,7 @@ function HomeScreen() {
     const playerPosition = player.position;
 
     for (const npc of npcs) {
-      setGameLog(prev => [`${getCurrentTime()} Awaiting ${npc.type} move...`, ...prev].slice(0, 100));
+      setGameLog(prev => [`${getCurrentTime()} Awaiting ${npc.type} #${npc.id} move...`, ...prev].slice(0, 100));
       let { x, y } = npc.position;
 
       // LLM-driven movement
