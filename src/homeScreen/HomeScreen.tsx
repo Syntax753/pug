@@ -147,7 +147,7 @@ function HomeScreen() {
       const userPrompt = `${npc.persona.goal}\n${npc.persona.prompt}\nThe pug is ${relativePosition}.\nWhich direction will you move?`;
       //setGameLog(prev => [`Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`, ...prev].slice(0, 100));
       const direction = (await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt)).toLowerCase();
-      setGameLog(prev => [`${getCurrentTime()} Response from LLM: ${direction}`, ...prev].slice(0, 100));
+      // setGameLog(prev => [`${getCurrentTime()} Response from LLM: ${direction}`, ...prev].slice(0, 100));
 
       // Translate direction to position change
       if (direction.toLowerCase().includes('up')) y--;
