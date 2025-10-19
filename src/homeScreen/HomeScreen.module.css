@@ -16,9 +16,19 @@
   padding-top: 2rem; /* Gap between top bar and grid */
 }
 
+.controlsContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Align children to the left */
+  width: 100%;
+  max-width: 640px; /* Corresponds to grid width */
+  margin: 0 auto; /* Center the container itself */
+}
+
 .prompt {
   margin-top: 16px; /* 16px gap between grid and prompt */
-  text-align: center;
+  text-align: left;
+  width: 100%;
 }
 
 .promptBox {
@@ -70,4 +80,11 @@
   align-items: end;
   justify-content: end;
   padding: 1rem;
+}
+
+.notificationArea {
+  text-align: left;
+  width: 100%;
+  margin-top: 1rem;
+  font-family: monospace;
 }

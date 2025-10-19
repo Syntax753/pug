@@ -61,7 +61,7 @@ function HomeScreen() {
   const [entities, setEntities] = useState<Entity[]>([
     { id: 1, persona: new Pug(), position: { x: 1, y: 1 } },
     { id: 2, persona: new Roach(), position: { x: 10, y: 10 } },
-  ]);
+  ]);   
 
   const [entityGrid, setEntityGrid] = useState<number[][]>(() => {
     const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
@@ -221,24 +221,26 @@ function HomeScreen() {
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
           <Grid layer0={layer0} entityGrid={entityGrid} width={GRID_WIDTH} height={GRID_HEIGHT} tileSize={tileSize} />
         </div>
-        <div className={styles.prompt}>
-          <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)} />
-          <ContentButton text="Send" onClick={() => {
-            submitPrompt(
-              'You are sidekick for Beethro the pug. You like to tell jokes',
-              prompt, () => setResponseText(GENERATING),
-              (response, isFinal) => { if (isFinal) _onRespond(response); else setResponseText(response); }
-            );
-            setPrompt('');
-          }} />
-          <ContentButton text="Zoom In" onClick={zoomIn} />
-          <ContentButton text="Zoom Out" onClick={zoomOut} /></p>
-          {response}
-        </div>
-        <div className={styles.notificationArea}>
-          {gameLog.map((msg, index) => (
-            <p key={index}>{msg}</p>
-          ))}
+        <div className={styles.controlsContainer}>
+          <div className={styles.prompt}>
+            <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)} />
+            <ContentButton text="Send" onClick={() => {
+              submitPrompt(
+                'You are sidekick for Beethro the pug. You like to tell jokes',
+                prompt, () => setResponseText(GENERATING),
+                (response, isFinal) => { if (isFinal) _onRespond(response); else setResponseText(response); }
+              );
+              setPrompt('');
+            }} />
+            <ContentButton text="Zoom In" onClick={zoomIn} />
+            <ContentButton text="Zoom Out" onClick={zoomOut} /></p>
+            {response}
+          </div>
+          <div className={styles.notificationArea}>
+            {gameLog.map((msg, index) => (
+              <p key={index}>{msg}</p>
+            ))}
+          </div>
         </div>
       </div>
     </div>
