@@ -13,7 +13,7 @@ import Pug from '@/persona/impl/Pug';
 import Roach from '@/persona/impl/Roach';
 
 const GRID_WIDTH = 20;
-const GRID_HEIGHT = 20;
+const GRID_HEIGHT = 17;
 
 // Simple noise function to create clusters
 function simpleNoise(x: number, y: number, seed: number = 0): number {
@@ -46,7 +46,7 @@ function HomeScreen() {
   const [prompt, setPrompt] = useState<string>('');
   const [responseText, setResponseText] = useState<string>('');
   const [tileSize, setTileSize] = useState<number>(32);
-  const [gameLog, setGameLog] = useState<string[]>(['Game started. Press Space to begin.']);
+  const [gameLog, setGameLog] = useState<string[]>([]);
   const [turn, setTurn] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(true);
   const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
@@ -57,6 +57,19 @@ function HomeScreen() {
     // Check for debug mode in URL params on initial load
     const params = new URLSearchParams(window.location.search);
     setIsDebug(params.get('debug') === 'true');
+
+    // Set initial game log message only if not in debug mode
+    if (params.get('debug') !== 'true') {
+      setGameLog(['Game started. Press Space to begin.']);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Prevent scrolling on the page
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'auto'; // Restore scrolling on component unmount
+    };
   }, []);
 
   const [entities, setEntities] = useState<Entity[]>([
@@ -91,8 +104,10 @@ function HomeScreen() {
     // Game Loop
     const runGameTurn = () => {
       const newLog: string[] = [];
-      newLog.push(`Starting Turn ${turn + 1}`);
-      setGameLog(prevLog => [...prevLog, ...newLog].slice(-10));
+      if (!isDebug) {
+        newLog.push(`Starting Turn ${turn + 1}`);
+        setGameLog(prevLog => [...prevLog, ...newLog].slice(-10));
+      }
 
       // Player's turn
       setAwaitingPlayerInput(true);
@@ -103,19 +118,17 @@ function HomeScreen() {
     // The main game loop is now event-driven by player input, so no timeout is needed here.
   }, [isLoading, isPaused, turn]);
 
-  const handlePlayerMove = (newPosition: Position) => {
-    if (!awaitingPlayerInput) return;
-
-    setAwaitingPlayerInput(false);
-
+  const executeTurn = (playerMove: Position) => {
     const intendedMoves: { entity: Entity, newPosition: Position }[] = [];
     const newLog: string[] = [];
 
     // 1. Calculate Player's intended move
     const player = entities.find(e => e.persona.isPlayer);
     if (player) {
-      intendedMoves.push({ entity: player, newPosition });
-      newLog.push(`Player intends to move to (${newPosition.x}, ${newPosition.y})`);
+      intendedMoves.push({ entity: player, newPosition: playerMove });
+      if (!isDebug) {
+        newLog.push(`Player intends to move to (${playerMove.x}, ${playerMove.y})`);
+      }
     }
 
     // 2. Calculate NPCs' intended moves
@@ -135,7 +148,9 @@ function HomeScreen() {
 
         const npcNewPosition = { x, y };
         intendedMoves.push({ entity, newPosition: npcNewPosition });
-        newLog.push(`${entity.persona.constructor.name} intends to move to (${npcNewPosition.x}, ${npcNewPosition.y})`);
+        if (!isDebug) {
+          newLog.push(`${entity.persona.constructor.name} intends to move to (${npcNewPosition.x}, ${npcNewPosition.y})`);
+        }
       }
     }
 
@@ -157,10 +172,10 @@ function HomeScreen() {
     });
 
     // 4. Log results and end turn
-    newLog.push("Hit Space to continue");
     setGameLog(prevLog => [...prevLog, ...newLog].slice(-10));
     setTurn(t => t + 1);
-    setIsPaused(true);
+    // The game is no longer paused between turns.
+    setAwaitingPlayerInput(true); // Immediately wait for the next player input.
   };
 
   useEffect(() => {
@@ -181,7 +196,8 @@ function HomeScreen() {
         else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') x++;
         else return; // Not a movement key
 
-        handlePlayerMove({ x, y });
+        setAwaitingPlayerInput(false);
+        executeTurn({ x, y });
       }
     };
 
@@ -191,7 +207,7 @@ function HomeScreen() {
 
   useEffect(() => {
     if (awaitingPlayerInput) {
-      const newLog = ["Your move (use arrows or WASD)"];
+      const newLog = isDebug ? ["Your move..."] : ["Your move (use arrows or WASD)"];
       setGameLog(prevLog => [...prevLog, ...newLog].slice(-10));
     }
   }, [awaitingPlayerInput]);
@@ -218,6 +234,11 @@ function HomeScreen() {
   
   return (
     <div className={styles.container}>
+      {isDebug && (
+        <div style={{ backgroundColor: 'red', color: 'white', textAlign: 'center', fontWeight: 'bold', padding: '0.25rem' }}>
+          Debug Mode
+        </div>
+      )}
       <TopBar />
       <div className={styles.content}>
         <div className={styles.notificationArea}>
