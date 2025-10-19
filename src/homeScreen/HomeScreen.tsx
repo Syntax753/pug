@@ -11,6 +11,7 @@ import { Entity, Position } from '@/persona/types';
 import styles from '@/homeScreen/HomeScreen.module.css';
 import Pug from '@/persona/impl/Pug';
 import Roach from '@/persona/impl/Roach';
+import RoachMother from '@/persona/impl/RoachMother';
 
 const SYSTEM_PROMPT = "You are a navigator and must return a single direction: up, down, left, or right.";
 const GRID_WIDTH = 20;
@@ -42,6 +43,13 @@ function loadGrid(width: number, height: number, seed: number): number[][] {
   return newGrid;
 }
 
+function getCurrentTime(): string {
+  const now = new Date();
+  const hours = now.getHours().toString().padStart(2, '0');
+  const minutes = now.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
 function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [prompt, setPrompt] = useState<string>('');
@@ -63,6 +71,7 @@ function HomeScreen() {
     { id: 1, type: 'pug', persona: new Pug(), position: { x: 1, y: 1 } },
     { id: 2, type: 'roach', persona: new Roach(), position: { x: 10, y: 10 } },
     { id: 3, type: 'roach', persona: new Roach(), position: { x: 11, y: 10 } },
+    { id: 4, type: 'roachMother', persona: new RoachMother(), position: { x: 3, y: 3 } },
   ]);   
 
   const [entityGrid, setEntityGrid] = useState<(string | number)[][]>(() => {
@@ -91,7 +100,7 @@ function HomeScreen() {
 
     // Game Loop
     const runGameTurn = () => {
-      setGameLog(prev => [`Awaiting player move (use arrows or WASD)`, `Start turn ${turn + 1}`, ...prev].slice(0, 100));
+      setGameLog(prev => [`${getCurrentTime()} Awaiting player move (use arrows or WASD)`, `${getCurrentTime()} Start turn ${turn + 1}`, ...prev].slice(0, 100));
       // Player's turn
       setAwaitingPlayerInput(true);
       // The rest of the turn logic will be triggered by player input in the other useEffect
@@ -104,7 +113,7 @@ function HomeScreen() {
   const executeTurn = async (playerDirection: 'up' | 'down' | 'left' | 'right') => {
     setAwaitingPlayerInput(false);
     const intendedMoves: { entity: Entity, newPosition: Position }[] = [];
-    setGameLog(prev => [`Player intends to move ${playerDirection}`, ...prev].slice(0, 100));
+    setGameLog(prev => [`${getCurrentTime()} Player intends to move ${playerDirection}`, ...prev].slice(0, 100));
 
     // 1. Calculate player's intended move
     const player = entities.find(e => e.type === 'pug');
@@ -116,17 +125,17 @@ function HomeScreen() {
     else if (playerDirection === 'right') playerX++;
     intendedMoves.push({ entity: player, newPosition: { x: playerX, y: playerY } });
 
-    // 2. Calculate roach moves sequentially
-    const roaches = entities.filter(e => e.type === 'roach').sort((a, b) => a.id - b.id);
+    // 2. Calculate NPC moves sequentially, ordered by ID
+    const npcs = entities.filter(e => !e.persona.isPlayer).sort((a, b) => a.id - b.id);
     const playerPosition = player.position;
 
-    for (const roach of roaches) {
-      setGameLog(prev => [`Awaiting roach move...`, ...prev].slice(0, 100));
-      let { x, y } = roach.position;
+    for (const npc of npcs) {
+      setGameLog(prev => [`${getCurrentTime()} Awaiting ${npc.type} move...`, ...prev].slice(0, 100));
+      let { x, y } = npc.position;
 
       // LLM-driven movement
-      const deltaX = playerPosition.x - roach.position.x;
-      const deltaY = playerPosition.y - roach.position.y;
+      const deltaX = playerPosition.x - npc.position.x;
+      const deltaY = playerPosition.y - npc.position.y;
 
       const horizontal = deltaX > 0 ? `${deltaX} steps right` : deltaX < 0 ? `${Math.abs(deltaX)} steps left` : '';
       const vertical = deltaY > 0 ? `${deltaY} steps down` : deltaY < 0 ? `${Math.abs(deltaY)} steps up` : '';
@@ -134,19 +143,19 @@ function HomeScreen() {
       let relativePosition = [vertical, horizontal].filter(Boolean).join(' and ');
       if (!relativePosition) relativePosition = 'at your location';
 
-      const userPrompt = `${roach.persona.goal}\n${roach.persona.prompt}\nThe player is ${relativePosition}.\nWhich direction will you move?`;
+      const userPrompt = `${npc.persona.goal}\n${npc.persona.prompt}\nThe player is ${relativePosition}.\nWhich direction will you move?`;
       //setGameLog(prev => [`Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`, ...prev].slice(0, 100));
-      const direction = await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt);
-      setGameLog(prev => [`Response from LLM: ${direction}`, ...prev].slice(0, 100));
+      const direction = (await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt)).toLowerCase();
+      setGameLog(prev => [`${getCurrentTime()} Response from LLM: ${direction}`, ...prev].slice(0, 100));
 
       // Translate direction to position change
       if (direction.toLowerCase().includes('up')) y--;
       else if (direction.toLowerCase().includes('down')) y++;
       else if (direction.toLowerCase().includes('left')) x--;
       else if (direction.toLowerCase().includes('right')) x++;
-      setGameLog(prev => [`Roach intends to move: ${direction}`, ...prev].slice(0, 100));
+      setGameLog(prev => [`${getCurrentTime()} ${npc.type} intends to move: ${direction}`, ...prev].slice(0, 100));
 
-      intendedMoves.push({ entity: roach, newPosition: { x, y } });
+      intendedMoves.push({ entity: npc, newPosition: { x, y } });
     }
 
     // 3. Apply all moves simultaneously

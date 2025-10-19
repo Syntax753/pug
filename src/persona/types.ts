@@ -7,7 +7,7 @@ export interface Position {
 
 export interface Entity {
   id: number;
-  type: 'pug' | 'roach';
+  type: 'pug' | 'roach' | 'roachMother';
   persona: Persona;
   position: Position;
 }
