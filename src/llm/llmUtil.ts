@@ -110,7 +110,8 @@ async function waitForReady() {
 export async function generate(
   systemPrompt: string, 
   prompt:string, 
-  onStatusUpdate:StatusUpdateCallback
+  onStatusUpdate:StatusUpdateCallback,
+  navigatorMode:boolean
 ):Promise<string> {
   await waitForReady();
   const cachedResponse = getCachedPromptResponse(prompt); // If your app doesn't benefit from cached responses, just delete this block below.
@@ -129,8 +130,7 @@ export async function generate(
   let message = '';
   let requestTime = Date.now();
   switch(theConnection.connectionType) {
-    // I'm assuming webLlmGenerate needs the systemPrompt based on other files.
-    case LLMConnectionType.WEBLLM: message = await webLlmGenerate(theConnection, messages, systemPrompt+'\n\n' + prompt, _captureFirstResponse); break;
+    case LLMConnectionType.WEBLLM: message = await webLlmGenerate(theConnection, messages, systemPrompt+'\n\n' + prompt, _captureFirstResponse, navigatorMode); break;
     default: throw Error('Unexpected');
   }
   updateModelDevicePerformanceHistory(theConnection.modelId, requestTime, firstResponseTime, Date.now(), _inputCharCount(prompt), message.length);

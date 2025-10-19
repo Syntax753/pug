@@ -8,7 +8,7 @@ import Roach from '@/persona/impl/Roach';
 
 interface GridProps {
   layer0: number[][];
-  entityGrid: number[][];
+  entityGrid: (string | number)[][];
   width: number;
   height: number;
   tileSize: number;
@@ -23,10 +23,6 @@ const tileMapping: { [key: number]: string | undefined } = {
   12: Tile12,
 };
 
-const entityMapping: { [key: number]: string | undefined } = {
-  1: pug.avatar.South,
-  2: roach.avatar.South,
-};
 
 function Grid({ layer0, entityGrid, width, height, tileSize }: GridProps) {
   const gridStyle = {
@@ -36,6 +32,11 @@ function Grid({ layer0, entityGrid, width, height, tileSize }: GridProps) {
     height: `${height * tileSize}px`,
   };
 
+  const entityImageMapping: { [key: string]: string } = {
+    'pug': pug.avatar.South,
+    'roach': roach.avatar.South,
+  };
+
   return (
     <div className={styles.gridContainer} style={gridStyle}>
       {layer0.map((row, rowIndex) => (
@@ -43,8 +44,8 @@ function Grid({ layer0, entityGrid, width, height, tileSize }: GridProps) {
           const bgValue = layer0[rowIndex][colIndex];
           const bgImage = tileMapping[bgValue];
 
-          const entityValue = entityGrid[rowIndex][colIndex];
-          const entityImage = entityMapping[entityValue];
+          const entityType = entityGrid[rowIndex][colIndex];
+          const entityImage = entityType ? entityImageMapping[entityType] : undefined;
 
           // console.log(`Rendering cell at (${rowIndex}, ${colIndex}): backgroundTile=${backgroundTile}, entityImage=${entityImage}`);
 

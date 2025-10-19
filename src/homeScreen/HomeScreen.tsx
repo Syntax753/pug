@@ -65,7 +65,7 @@ function HomeScreen() {
     { id: 3, type: 'roach', persona: new Roach(), position: { x: 11, y: 10 } },
   ]);   
 
-  const [entityGrid, setEntityGrid] = useState<number[][]>(() => {
+  const [entityGrid, setEntityGrid] = useState<(string | number)[][]>(() => {
     const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
     return newGrid;
   });
@@ -81,7 +81,7 @@ function HomeScreen() {
   useEffect(() => {
     const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
     for (const entity of entities) {
-      newGrid[entity.position.y][entity.position.x] = entity.id;
+      newGrid[entity.position.y][entity.position.x] = entity.type;
     }
     setEntityGrid(newGrid);
   }, [entities]);
@@ -204,7 +204,8 @@ function HomeScreen() {
         SYSTEM_MESSAGE,
         prompt,
         () => setResponseText(GENERATING),
-        (response, isFinal) => { if (isFinal) _onRespond(response); else setResponseText(response); }
+        (response, isFinal) => { if (isFinal) _onRespond(response); else setResponseText(response); },
+        false
       );
       setPrompt('');
     }
@@ -237,8 +238,10 @@ function HomeScreen() {
             <ContentButton text="Send" onClick={() => {
               submitPrompt(
                 'You are sidekick for Beethro the pug. You like to tell jokes',
-                prompt, () => setResponseText(GENERATING),
-                (response, isFinal) => { if (isFinal) _onRespond(response); else setResponseText(response); }
+                prompt,
+                () => setResponseText(GENERATING),
+                (response, isFinal) => { if (isFinal) _onRespond(response); else setResponseText(response); },
+                false
               );
               setPrompt('');
             }} />

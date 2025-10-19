@@ -9,7 +9,8 @@ export async function submitPrompt(
   systemPrompt: string,
   prompt: string,
   onStart: () => void,
-  onResponse: (response: string, isFinal: boolean) => void
+  onResponse: (response: string, isFinal: boolean) => void,
+  navigatorMode: boolean
 ) {
     onStart();
     try {
@@ -20,7 +21,7 @@ export async function submitPrompt(
         onResponse(message, true); 
         return; 
       }
-      generate(systemPrompt, prompt, (status: string, percentComplete: number) => onResponse(status, percentComplete === 1));
+      generate(systemPrompt, prompt, (status: string, percentComplete: number) => onResponse(status, percentComplete === 1), navigatorMode);
     } catch(e) {
       console.error('Error while generating response.', e);
       onResponse('Error while generating response.', true);

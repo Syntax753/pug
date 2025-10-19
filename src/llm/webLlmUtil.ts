@@ -47,7 +47,7 @@ export async function webLlmConnect(modelId:string, connection:LLMConnection, on
   }
 }
 
-export async function webLlmGenerate(connection:LLMConnection, llmMessages:LLMMessages, prompt:string, onStatusUpdate:StatusUpdateCallback):Promise<string> {
+export async function webLlmGenerate(connection:LLMConnection, llmMessages:LLMMessages, prompt:string, onStatusUpdate:StatusUpdateCallback, navigatorMode:boolean):Promise<string> {
   const engine = connection.webLLMEngine;
   if (!engine) throw Error('Unexpected');
 
@@ -57,7 +57,7 @@ export async function webLlmGenerate(connection:LLMConnection, llmMessages:LLMMe
     stream: true,
     seed: 0,
     messages,
-    temperature: 0.2
+    temperature: navigatorMode ? 0.0 : 0.7,
   };
   addUserMessageToChatHistory(llmMessages, prompt);
   

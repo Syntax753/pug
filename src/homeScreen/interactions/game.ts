@@ -8,7 +8,8 @@ export async function getLLMNavigatorMove(
             systemPrompt,
             userPrompt,
             () => {}, // onStart
-            (response, isFinal) => { if (isFinal) resolve(response || "down"); }
+            (response, isFinal) => { if (isFinal) resolve(response || "down"); },
+            true
         );
     });
 }
