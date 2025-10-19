@@ -5,6 +5,7 @@ import Tile6 from '@/assets/layer0/tile_6.png';
 import Tile12 from '@/assets/layer0/tile_12.png';
 import Pug from '@/persona/impl/Pug';
 import Roach from '@/persona/impl/Roach';
+import RoachMother from '@/persona/impl/RoachMother';
 
 interface GridProps {
   layer0: number[][];
@@ -16,6 +17,7 @@ interface GridProps {
 
 const pug = new Pug();
 const roach = new Roach();
+const roachMother = new RoachMother();
 
 const tileMapping: { [key: number]: string | undefined } = {
   1: Tile1,
@@ -35,6 +37,7 @@ function Grid({ layer0, entityGrid, width, height, tileSize }: GridProps) {
   const entityImageMapping: { [key: string]: string } = {
     'pug': pug.avatar.South,
     'roach': roach.avatar.South,
+    'roachMother': roachMother.avatar.South,
   };
 
   return (
