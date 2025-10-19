@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "vite",
     "copyViteManifestForDev": "cp -r dist/.vite public",
-    "build": "tsc && vite build && npm run copyViteManifestForDev",
+    "build": "tsc && npm run generate && vite build && npm run copyViteManifestForDev",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
+    "generate": "node src/assets/genesis.js",
     "setup-portal-workflows": "node -e \"const fs = require('fs'); const path = require('path'); const dest = '.github/workflows'; fs.mkdirSync(dest, { recursive: true }); fs.readdirSync('./node_modules/decent-portal/github-workflows').forEach(file => { if (file.endsWith('.yml')) fs.copyFileSync(path.join('./node_modules/decent-portal/github-workflows', file), path.join(dest, file)); });\"",
     "test": "vitest --run",
     "test:watch": "vitest --watch",
