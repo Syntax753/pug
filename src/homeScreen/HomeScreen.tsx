@@ -125,7 +125,16 @@ function HomeScreen() {
       let { x, y } = roach.position;
 
       // LLM-driven movement
-      const userPrompt = `${roach.persona.goal}\n${roach.persona.prompt}\nYour coordinates are (${roach.position.x}, ${roach.position.y}). The player's coordinates are (${playerPosition.x}, ${playerPosition.y}).\nWhich direction should I move?`;
+      const deltaX = playerPosition.x - roach.position.x;
+      const deltaY = playerPosition.y - roach.position.y;
+
+      const horizontal = deltaX > 0 ? `${deltaX} steps right` : deltaX < 0 ? `${Math.abs(deltaX)} steps left` : '';
+      const vertical = deltaY > 0 ? `${deltaY} steps down` : deltaY < 0 ? `${Math.abs(deltaY)} steps up` : '';
+
+      let relativePosition = [vertical, horizontal].filter(Boolean).join(' and ');
+      if (!relativePosition) relativePosition = 'at your location';
+
+      const userPrompt = `${roach.persona.goal}\n${roach.persona.prompt}\nThe player is ${relativePosition}.\nWhich direction should I move?`;
       console.log(userPrompt);
       setGameLog(prev => [`Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`, ...prev].slice(0, 100));
       const direction = await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt);
