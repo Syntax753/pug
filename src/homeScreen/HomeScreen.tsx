@@ -12,6 +12,7 @@ import styles from '@/homeScreen/HomeScreen.module.css';
 import Pug from '@/persona/impl/Pug';
 import Roach from '@/persona/impl/Roach';
 
+const SYSTEM_PROMPT = "You are a navigator and must return a single direction: up, down, left, or right.";
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 17;
 
@@ -59,9 +60,9 @@ function HomeScreen() {
   }, []);
 
   const [entities, setEntities] = useState<Entity[]>([
-    { id: 1, persona: new Pug(), position: { x: 1, y: 1 } },
-    { id: 2, persona: new Roach(), position: { x: 10, y: 10 } },
-    { id: 2, persona: new Roach(), position: { x: 11, y: 10 } },
+    { id: 1, type: 'pug', persona: new Pug(), position: { x: 1, y: 1 } },
+    { id: 2, type: 'roach', persona: new Roach(), position: { x: 10, y: 10 } },
+    { id: 3, type: 'roach', persona: new Roach(), position: { x: 11, y: 10 } },
   ]);   
 
   const [entityGrid, setEntityGrid] = useState<number[][]>(() => {
@@ -103,54 +104,57 @@ function HomeScreen() {
     // The main game loop is now event-driven by player input, so no timeout is needed here.
   }, [isLoading, turn]);
 
-  const executeTurn = async (playerMove: Position, playerDirection: string) => {
+  const executeTurn = async (playerDirection: 'up' | 'down' | 'left' | 'right') => {
+    setAwaitingPlayerInput(false);
     const intendedMoves: { entity: Entity, newPosition: Position }[] = [];
     const turnLog: string[] = [`Start turn ${turn + 1}`];
-    turnLog.push(`Awaiting player move`);
-    turnLog.push(`Player intends to move ${playerDirection}`);
     setGameLog(turnLog);
+    
+    const playerPosition = entities.find(e => e.type === 'pug')?.position;
+    if (!playerPosition) return;
 
-    // 1. Calculate Player's intended move
-    const playerEntity = entities.find(e => e.persona.isPlayer);
-    if (playerEntity) {
-      intendedMoves.push({ entity: playerEntity, newPosition: playerMove });
-    }
-
-    // 2. Calculate NPCs' intended moves
-    const playerPosition = playerEntity?.position;
-    const npcEntities = entities.filter(e => !e.persona.isPlayer);
-
-    const npcMovePromises = npcEntities.map(async (entity) => {
-      if (!playerPosition) return null;
-
-      setGameLog(prev => [...prev, `Awaiting roach move`]);
+    const movePromises = entities.map(async (entity) => {
       let { x, y } = entity.position;
+      
+      if (entity.type === 'pug') {
+        setGameLog(prev => [...prev, `Player intends to move ${playerDirection}`]);
+        if (playerDirection === 'up') y--;
+        else if (playerDirection === 'down') y++;
+        else if (playerDirection === 'left') x--;
+        else if (playerDirection === 'right') x++;
+        return { entity, newPosition: { x, y } };
+      }
 
-      // LLM-driven movement
-      const userPrompt = `${entity.persona.goal}\n${entity.persona.prompt}\nMy coordinates are (${entity.position.x}, ${entity.position.y}). The player's coordinates are (${playerPosition.x}, ${playerPosition.y}).\nWhich direction should I move?`;
-      setGameLog(prev => [...prev, `Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`]);
-      const direction = await getLLMNavigatorMove(userPrompt);
-      setGameLog(prev => [...prev, `Response from LLM: ${direction}`]);
+      if (entity.type === 'roach') {
+        setGameLog(prev => [...prev, `Awaiting roach move`]);
+        
+        // LLM-driven movement
+        const userPrompt = `${entity.persona.goal}\n${entity.persona.prompt}\nMy coordinates are (${entity.position.x}, ${entity.position.y}). The player's coordinates are (${playerPosition.x}, ${playerPosition.y}).\nWhich direction should I move?`;
+        setGameLog(prev => [...prev, `Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`]);
+        const direction = await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt);
+        setGameLog(prev => [...prev, `Response from LLM: ${direction}`]);
 
-      // Translate direction to position change
-      if (direction.toLowerCase().includes('up')) y--;
-      else if (direction.toLowerCase().includes('down')) y++;
-      else if (direction.toLowerCase().includes('left')) x--;
-      else if (direction.toLowerCase().includes('right')) x++;
-      setGameLog(prev => [...prev, `Roach intends to move ${direction}`]);
+        // Translate direction to position change
+        if (direction.toLowerCase().includes('up')) y--;
+        else if (direction.toLowerCase().includes('down')) y++;
+        else if (direction.toLowerCase().includes('left')) x--;
+        else if (direction.toLowerCase().includes('right')) x++;
+        setGameLog(prev => [...prev, `Roach intends to move ${direction}`]);
 
-      return { entity, newPosition: { x, y } };
+        return { entity, newPosition: { x, y } };
+      }
+
+      return { entity, newPosition: entity.position }; // No move for unknown types
     });
 
-    const npcMoves = (await Promise.all(npcMovePromises)).filter(move => move !== null);
-    intendedMoves.push(...npcMoves as { entity: Entity; newPosition: Position; }[]);
+    const allMoves = await Promise.all(movePromises);
+    intendedMoves.push(...allMoves);
 
     // 3. Apply all moves simultaneously
     setEntities(prevEntities => {
       return prevEntities.map(e => {
         const move = intendedMoves.find(m => m.entity.id === e.id);
         if (move) {
-          // Basic boundary check
           if (
             move.newPosition.x >= 0 && move.newPosition.x < GRID_WIDTH &&
             move.newPosition.y >= 0 && move.newPosition.y < GRID_HEIGHT
@@ -164,7 +168,7 @@ function HomeScreen() {
 
     // 4. Log results and end turn
     setTurn(t => t + 1);
-    setAwaitingPlayerInput(true); // Immediately wait for the next player input.
+    setAwaitingPlayerInput(true);
   };
 
   useEffect(() => {
@@ -181,7 +185,7 @@ function HomeScreen() {
         else return; // Not a movement key
 
         setAwaitingPlayerInput(false);
-        executeTurn({ x: player.position.x + (direction === 'left' ? -1 : direction === 'right' ? 1 : 0), y: player.position.y + (direction === 'up' ? -1 : direction === 'down' ? 1 : 0) }, direction);
+        executeTurn(direction);
       }
     };
 
