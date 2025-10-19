@@ -13,7 +13,7 @@ import Pug from '@/persona/impl/Pug';
 import Roach from '@/persona/impl/Roach';
 import RoachMother from '@/persona/impl/RoachMother';
 
-const SYSTEM_PROMPT = "You are a navigator and must return a single direction: up, down, left, or right.";
+const SYSTEM_PROMPT = "You are an expert system that gives directions - you must only respond with a single direction from up, down, left or right.";
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 17;
 
@@ -114,7 +114,7 @@ function HomeScreen() {
   const executeTurn = async (playerDirection: 'up' | 'down' | 'left' | 'right') => {
     setAwaitingPlayerInput(false);
     const intendedMoves: { entity: Entity, newPosition: Position }[] = [];
-    setGameLog(prev => [`${getCurrentTime()} Player intends to move ${playerDirection}`, ...prev].slice(0, 100));
+    setGameLog(prev => [`${getCurrentTime()} Player : ${playerDirection}`, ...prev].slice(0, 100));
 
     // 1. Calculate player's intended move
     const player = entities.find(e => e.type === 'pug');
@@ -150,10 +150,10 @@ function HomeScreen() {
       setGameLog(prev => [`${getCurrentTime()} Response from LLM: ${direction}`, ...prev].slice(0, 100));
 
       // Translate direction to position change
-      if (direction.toLowerCase().includes(' move up ')) y--;
-      else if (direction.toLowerCase().includes(' move down ')) y++;
-      else if (direction.toLowerCase().includes(' move left ')) x--;
-      else if (direction.toLowerCase().includes(' move right ')) x++;
+      if (direction.toLowerCase().includes('up')) y--;
+      else if (direction.toLowerCase().includes('down ')) y++;
+      else if (direction.toLowerCase().includes('left')) x--;
+      else if (direction.toLowerCase().includes('right')) x++;
       setGameLog(prev => [`${getCurrentTime()} ${npc.type} intends to move: ${direction}`, ...prev].slice(0, 100));
 
       intendedMoves.push({ entity: npc, newPosition: { x, y } });
