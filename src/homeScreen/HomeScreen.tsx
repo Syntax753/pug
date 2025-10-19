@@ -150,10 +150,10 @@ function HomeScreen() {
       setGameLog(prev => [`${getCurrentTime()} Response from LLM: ${direction}`, ...prev].slice(0, 100));
 
       // Translate direction to position change
-      if (direction.toLowerCase().includes(' up ')) y--;
-      else if (direction.toLowerCase().includes(' down ')) y++;
-      else if (direction.toLowerCase().includes(' left ')) x--;
-      else if (direction.toLowerCase().includes(' right ')) x++;
+      if (direction.toLowerCase().includes(' move up ')) y--;
+      else if (direction.toLowerCase().includes(' move down ')) y++;
+      else if (direction.toLowerCase().includes(' move left ')) x--;
+      else if (direction.toLowerCase().includes(' move right ')) x++;
       setGameLog(prev => [`${getCurrentTime()} ${npc.type} intends to move: ${direction}`, ...prev].slice(0, 100));
 
       intendedMoves.push({ entity: npc, newPosition: { x, y } });
