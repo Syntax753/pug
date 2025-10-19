@@ -129,7 +129,8 @@ function HomeScreen() {
         setGameLog(prev => [...prev, `Awaiting roach move`]);
         
         // LLM-driven movement
-        const userPrompt = `${entity.persona.goal}\n${entity.persona.prompt}\nMy coordinates are (${entity.position.x}, ${entity.position.y}). The player's coordinates are (${playerPosition.x}, ${playerPosition.y}).\nWhich direction should I move?`;
+        const userPrompt = `${entity.persona.goal}\n${entity.persona.prompt}\nYour coordinates are (${entity.position.x}, ${entity.position.y}). The player's coordinates are (${playerPosition.x}, ${playerPosition.y}).\nWhich direction should I move?`;
+        console.log(userPrompt);
         setGameLog(prev => [...prev, `Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`]);
         const direction = await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt);
         setGameLog(prev => [...prev, `Response from LLM: ${direction}`]);

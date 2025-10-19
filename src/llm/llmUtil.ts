@@ -99,7 +99,20 @@ export function clearChatHistory() {
   messages.chatHistory = [];
 }
 
-export async function generate(prompt:string, onStatusUpdate:StatusUpdateCallback):Promise<string> {
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+async function waitForReady() {
+  while (theConnection.state !== LLMConnectionState.READY) {
+    await delay(100); // wait 100ms before checking again
+  }
+}
+
+export async function generate(
+  systemPrompt: string, 
+  prompt:string, 
+  onStatusUpdate:StatusUpdateCallback
+):Promise<string> {
+  await waitForReady();
   const cachedResponse = getCachedPromptResponse(prompt); // If your app doesn't benefit from cached responses, just delete this block below.
   if (cachedResponse) {
     onStatusUpdate(cachedResponse, 100);
@@ -112,13 +125,12 @@ export async function generate(prompt:string, onStatusUpdate:StatusUpdateCallbac
     onStatusUpdate(status, percentComplete);
   }
 
-  if (!isLlmConnected()) throw Error('LLM connection is not initialized.');
-  if (theConnection.state !== LLMConnectionState.READY) throw Error('LLM is not in ready state.');
   theConnection.state = LLMConnectionState.GENERATING;
   let message = '';
   let requestTime = Date.now();
   switch(theConnection.connectionType) {
-    case LLMConnectionType.WEBLLM: message = await webLlmGenerate(theConnection, messages, prompt, _captureFirstResponse); break;
+    // I'm assuming webLlmGenerate needs the systemPrompt based on other files.
+    case LLMConnectionType.WEBLLM: message = await webLlmGenerate(theConnection, messages, systemPrompt+'\n\n' + prompt, _captureFirstResponse); break;
     default: throw Error('Unexpected');
   }
   updateModelDevicePerformanceHistory(theConnection.modelId, requestTime, firstResponseTime, Date.now(), _inputCharCount(prompt), message.length);

@@ -20,7 +20,7 @@ export async function submitPrompt(
         onResponse(message, true); 
         return; 
       }
-      generate(systemPrompt + '\n\n'+ prompt, (status: string, percentComplete: number) => onResponse(status, percentComplete === 1));
+      generate(systemPrompt, prompt, (status: string, percentComplete: number) => onResponse(status, percentComplete === 1));
     } catch(e) {
       console.error('Error while generating response.', e);
       onResponse('Error while generating response.', true);
