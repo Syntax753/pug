@@ -237,8 +237,20 @@ function HomeScreen() {
     <div className={styles.container}>
       <TopBar />
       <div className={styles.content}>
-        <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+        <div className={styles.mainArea}>
           <Grid layer0={layer0} entityGrid={entityGrid} width={GRID_WIDTH} height={GRID_HEIGHT} tileSize={tileSize} />
+          <div className={styles.notificationArea} style={{ overflowY: 'auto' }}>
+            {gameLog.map((msg, index) => (
+              <p
+                key={index}
+                style={{
+                  fontFamily: 'system-ui, sans-serif',
+                  fontSize: '0.8rem',
+                  padding: '0.2rem 0.5rem'
+                }}
+              >{msg}</p>
+            ))}
+          </div>
         </div>
         <div className={styles.controlsContainer}>
           <div className={styles.prompt}>
@@ -256,18 +268,6 @@ function HomeScreen() {
             <ContentButton text="Zoom In" onClick={zoomIn} />
             <ContentButton text="Zoom Out" onClick={zoomOut} /></p>
             {response}
-          </div>
-          <div className={styles.notificationArea} style={{ height: '10em', overflowY: 'auto' }}>
-            {gameLog.map((msg, index) => (
-              <p
-                key={index}
-                style={{
-                  fontFamily: 'system-ui, sans-serif',
-                  fontSize: '0.8rem',
-                  padding: '0.2rem 0.5rem'
-                }}
-              >{msg}</p>
-            ))}
           </div>
         </div>
       </div>
