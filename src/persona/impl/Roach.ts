@@ -9,7 +9,7 @@ class Roach implements Persona {
         South: roachImage,
         West: roachImage,
     };
-    public goal: string = "You are a roach. You are hungry. You want to reach the player and eat them.";
+    public goal: string = "You want to reach the pug.";
     public prompt: string = "You prefer vertical movement over horizontal movement.";
 }
 
