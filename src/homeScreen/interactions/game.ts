@@ -12,8 +12,7 @@ export async function getLLMNavigatorMove(
 ): Promise<string> {
     return new Promise((resolve) => {
         submitPrompt(
-            SYSTEM_PROMPT,
-            userPrompt,
+            SYSTEM_PROMPT + "\n" + userPrompt,
             () => {}, // onStart
             (response, isFinal) => { if (isFinal) resolve(response || "down"); }
         );

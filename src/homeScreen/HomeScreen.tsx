@@ -4,8 +4,7 @@ import WaitingEllipsis from '@/components/waitingEllipsis/WaitingEllipsis';
 import ContentButton from '@/components/contentButton/ContentButton';
 import LoadScreen from '@/loadScreen/LoadScreen';
 import TopBar from '@/components/topBar/TopBar';
-import Grid from '@/components/grid/Grid'; // This line is already correct
-import GridData from '@/components/gridData/GridData';
+import Grid from '@/components/grid/Grid';  
 import { GENERATING, submitPrompt } from '@/homeScreen/interactions/prompt';
 import { getLLMNavigatorMove } from '@/homeScreen/interactions/game';
 import { Entity, Position } from '@/persona/types';
@@ -47,19 +46,9 @@ function HomeScreen() {
   const [prompt, setPrompt] = useState<string>('');
   const [responseText, setResponseText] = useState<string>('');
   const [tileSize, setTileSize] = useState<number>(32);
-  const [gameLog, setGameLog] = useState<string[]>(['Game started. Press Space to begin.']);
-  const [turn, setTurn] = useState<number>(1);
+  const [_, setGameLog] = useState<string[]>([]);
+  const [turn, setTurn] = useState<number>(0);
   const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
-
-  const [isDebug, setIsDebug] = useState<boolean>(false);
-
-  useEffect(() => {
-    // Check for debug mode in URL params on initial load
-    const params = new URLSearchParams(window.location.search);
-    setIsDebug(params.get('debug') === 'true');
-
-    setGameLog([]);
-  }, []);
 
   useEffect(() => {
     // Prevent scrolling on the page
@@ -100,107 +89,87 @@ function HomeScreen() {
 
     // Game Loop
     const runGameTurn = () => {
-      const newLog: string[] = [`Start turn ${turn}`];
-      newLog.push(`Awaiting player move (use arrows or WASD)`);
-      if (isDebug) setGameLog(prevLog => [...prevLog, ...newLog].slice(-10));
-      else setGameLog(newLog);
+      const newLog: string[] = [`Start turn ${turn + 1}`];
+      newLog.push(`Awaiting player move`);
+      setGameLog(newLog);
 
       // Player's turn
       setAwaitingPlayerInput(true);
+      // The rest of the turn logic will be triggered by player input in the other useEffect
     };
 
     runGameTurn();
     // The main game loop is now event-driven by player input, so no timeout is needed here.
   }, [isLoading, turn]);
 
-  const handlePlayerMove = async (playerDirection: 'up' | 'down' | 'left' | 'right') => {
-    setAwaitingPlayerInput(false);
-    const turnLog: string[] = [];
+  const executeTurn = async (playerMove: Position) => {
+    const intendedMoves: { entity: Entity, newPosition: Position }[] = [];
+    // 1. Calculate Player's intended move
+    const player = entities.find(e => e.persona.isPlayer);
+    if (player) {
+      intendedMoves.push({ entity: player, newPosition: playerMove });
+      setGameLog(prev => [...prev, `Player intends to move to (${playerMove.x}, ${playerMove.y})`].slice(-10));
 
-    // 1. Move player instantly and get their new position
-    let playerNewPosition: Position | null = null;
-    setEntities(prevEntities => {
-      const newEntities = [...prevEntities];
-      const playerIndex = newEntities.findIndex(e => e.persona.isPlayer);
-      if (playerIndex !== -1) {
-        const player = newEntities[playerIndex];
-        let { x, y } = player.position;
-
-        if (playerDirection === 'up') y--;
-        else if (playerDirection === 'down') y++;
-        else if (playerDirection === 'left') x--;
-        else if (playerDirection === 'right') x++;
-
-        // Boundary check
-        if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT) {
-          playerNewPosition = { x, y };
-          newEntities[playerIndex] = { ...player, position: playerNewPosition };
-          if (isDebug) turnLog.push(`Player moved ${playerDirection} to (${x}, ${y})`);
-        }
-      }
-      return newEntities;
-    });
-
-    // 2. Trigger NPC moves in the background
-    if (playerNewPosition) {
-      executeNpcTurns(playerNewPosition, turnLog);
-    } else {
-      // If player didn't move, just start the next turn
-      setTurn(t => t + 1);
     }
-  };
 
-  const executeNpcTurns = async (playerPosition: Position, turnLog: string[]) => {
-    const npcMoves: { entity: Entity, newPosition: Position }[] = [];
+    // 2. Calculate NPCs' intended moves
+    const playerPosition = player?.position;
+    for (const entity of entities) {
+      if (!entity.persona.isPlayer && playerPosition) {
+        let { x, y } = entity.position;
 
-    // Calculate all NPC moves
-    for (const entity of entities.filter(e => !e.persona.isPlayer)) {
-      if (isDebug) turnLog.push(`Awaiting roach move...`);
-      const personaName = entity.persona.constructor.name;
-      let { x, y } = entity.position;
-      const userPrompt = `${entity.persona.goal}\n${entity.persona.prompt}\nMy coordinates are (${entity.position.x}, ${entity.position.y}). The player's coordinates are (${playerPosition.x}, ${playerPosition.y}).\nWhich direction should I move?`;
-      if (isDebug) turnLog.push(`LLM Request => ${userPrompt.replace(/\n/g, ' ')}`);
+        // LLM-driven movement
+        const userPrompt = `${entity.persona.goal}\n${entity.persona.prompt}\nMy coordinates are (${entity.position.x}, ${entity.position.y}). The player's coordinates are (${playerPosition.x}, ${playerPosition.y}).\nWhich direction should I move?`;
+        const direction = await getLLMNavigatorMove(userPrompt);
 
-      const direction = await getLLMNavigatorMove(userPrompt);
-      if (isDebug) turnLog.push(`LLM Response <= ${direction}`);
+        // Translate direction to position change
+        if (direction.toLowerCase().includes('up')) y--;
+        else if (direction.toLowerCase().includes('down')) y++;
+        else if (direction.toLowerCase().includes('left')) x--;
+        else if (direction.toLowerCase().includes('right')) x++;
 
-      if (direction.toLowerCase().includes('up')) y--;
-      else if (direction.toLowerCase().includes('down')) y++;
-      else if (direction.toLowerCase().includes('left')) x--;
-      else if (direction.toLowerCase().includes('right')) x++;
-
-      if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT) {
-        npcMoves.push({ entity, newPosition: { x, y } });
+        const npcNewPosition = { x, y };
+        intendedMoves.push({ entity, newPosition: npcNewPosition });
       }
     }
 
-    // Apply all NPC moves
+    // 3. Apply all moves simultaneously
     setEntities(prevEntities => {
       return prevEntities.map(e => {
-        const move = npcMoves.find(m => m.entity.id === e.id);
+        const move = intendedMoves.find(m => m.entity.id === e.id);
         if (move) {
-          return { ...e, position: move.newPosition };
+          // Basic boundary check
+          if (
+            move.newPosition.x >= 0 && move.newPosition.x < GRID_WIDTH &&
+            move.newPosition.y >= 0 && move.newPosition.y < GRID_HEIGHT
+          ) {
+            return { ...e, position: move.newPosition };
+          }
         }
         return e;
       });
     });
 
-    // Log results and start next turn
-    if (isDebug) setGameLog(prev => [...prev, ...turnLog].slice(-10));
+    // 4. Log results and end turn
     setTurn(t => t + 1);
+    setAwaitingPlayerInput(true); // Immediately wait for the next player input.
   };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (awaitingPlayerInput) {
-        let direction: 'up' | 'down' | 'left' | 'right' | null = null;
-        if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') direction = 'up';
-        else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') direction = 'down';
-        else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') direction = 'left';
-        else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') direction = 'right';
+        const player = entities.find(e => e.persona.isPlayer);
+        if (!player) return;
+
+        let { x, y } = player.position;
+        if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') y--;
+        else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') y++;
+        else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') x--;
+        else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') x++;
         else return; // Not a movement key
 
-        handlePlayerMove(direction);
+        setAwaitingPlayerInput(false);
+        executeTurn({ x, y }); // This will now correctly handle the async nature
       }
     };
 
@@ -215,7 +184,6 @@ function HomeScreen() {
   function _onKeyDown(e:React.KeyboardEvent<HTMLInputElement>) {
     if(e.key === 'Enter' && prompt !== '') {
       submitPrompt(
-        SYSTEM_MESSAGE,
         prompt,
         () => setResponseText(GENERATING),
         (response, isFinal) => { if (isFinal) _onRespond(response); else setResponseText(response); }
@@ -244,18 +212,12 @@ function HomeScreen() {
       <div className={styles.content}>
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
           <Grid layer0={layer0} entityGrid={entityGrid} width={GRID_WIDTH} height={GRID_HEIGHT} tileSize={tileSize} />
-          {isDebug && (
-            <>
-              <GridData grid={layer0} />
-              <GridData grid={entityGrid} />
-            </>
-          )}
         </div>
         <div className={styles.prompt}>
           <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)} />
           <ContentButton text="Send" onClick={() => {
             submitPrompt(
-              SYSTEM_MESSAGE, prompt, () => setResponseText(GENERATING),
+              prompt, () => setResponseText(GENERATING),
               (response, isFinal) => { if (isFinal) _onRespond(response); else setResponseText(response); }
             );
             setPrompt('');
@@ -263,11 +225,6 @@ function HomeScreen() {
           <ContentButton text="Zoom In" onClick={zoomIn} />
           <ContentButton text="Zoom Out" onClick={zoomOut} /></p>
           {response}
-        </div>
-        <div className={styles.notificationArea}>
-          {gameLog.map((msg, index) => (
-            <p key={index}>{msg}</p>
-          ))}
         </div>
       </div>
     </div>

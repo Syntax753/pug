@@ -11,7 +11,6 @@ export const SYSTEM_MESSAGE = "You are a screen in a web app. Your name is \"Scr
 export const GENERATING = '...';
 
 export async function submitPrompt(
-  systemPrompt: string,
   prompt: string,
   onStart: () => void,
   onResponse: (response: string, isFinal: boolean) => void
@@ -25,7 +24,7 @@ export async function submitPrompt(
         onResponse(message, true); 
         return; 
       }
-      generate(systemPrompt, prompt, (status: string, percentComplete: number) => onResponse(status, percentComplete === 1));
+      generate(prompt, (status: string, percentComplete: number) => onResponse(status, percentComplete === 1));
     } catch(e) {
       console.error('Error while generating response.', e);
       onResponse('Error while generating response.', true);
