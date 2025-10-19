@@ -114,7 +114,7 @@ function HomeScreen() {
   const executeTurn = async (playerDirection: 'up' | 'down' | 'left' | 'right') => {
     setAwaitingPlayerInput(false);
     const intendedMoves: { entity: Entity, newPosition: Position }[] = [];
-    setGameLog(prev => [`${getCurrentTime()} Player : ${playerDirection}`, ...prev].slice(0, 100));
+    setGameLog(prev => [`${getCurrentTime()} Player move: ${playerDirection}`, ...prev].slice(0, 100));
 
     // 1. Calculate player's intended move
     const player = entities.find(e => e.type === 'pug');
@@ -163,6 +163,7 @@ function HomeScreen() {
     setEntities(prevEntities => {
       return prevEntities.map(e => {
         const move = intendedMoves.find(m => m.entity.id === e.id);
+        console.log("Enemy move: ", e.id, move);
         if (move) {
           if (
             move.newPosition.x >= 0 && move.newPosition.x < GRID_WIDTH &&
