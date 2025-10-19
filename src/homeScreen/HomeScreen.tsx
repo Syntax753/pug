@@ -135,7 +135,7 @@ function HomeScreen() {
       if (!relativePosition) relativePosition = 'at your location';
 
       const userPrompt = `${roach.persona.goal}\n${roach.persona.prompt}\nThe player is ${relativePosition}.\nWhich direction will you move?`;
-        setGameLog(prev => [`Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`, ...prev].slice(0, 100));
+      //setGameLog(prev => [`Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`, ...prev].slice(0, 100));
       const direction = await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt);
       setGameLog(prev => [`Response from LLM: ${direction}`, ...prev].slice(0, 100));
 
@@ -144,7 +144,7 @@ function HomeScreen() {
       else if (direction.toLowerCase().includes('down')) y++;
       else if (direction.toLowerCase().includes('left')) x--;
       else if (direction.toLowerCase().includes('right')) x++;
-      setGameLog(prev => [`Roach intends to move ${direction}`, ...prev].slice(0, 100));
+      setGameLog(prev => [`Roach intends to move: ${direction}`, ...prev].slice(0, 100));
 
       intendedMoves.push({ entity: roach, newPosition: { x, y } });
     }
