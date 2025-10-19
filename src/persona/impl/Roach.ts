@@ -10,7 +10,7 @@ class Roach implements Persona {
         West: roachImage,
     };
     public goal: string = "You are a roach. You are hungry. You want to reach the player and eat them.";
-    public prompt: string = "You prefer vertical movement over horizontal movement. Respond with a single direction up, down, left or right";
+    public prompt: string = "You prefer vertical movement over horizontal movement.";
 }
 
 export default Roach;

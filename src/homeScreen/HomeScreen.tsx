@@ -134,7 +134,7 @@ function HomeScreen() {
       let relativePosition = [vertical, horizontal].filter(Boolean).join(' and ');
       if (!relativePosition) relativePosition = 'at your location';
 
-      const userPrompt = `${roach.persona.goal}\n${roach.persona.prompt}\nThe player is ${relativePosition}.\nWhich direction should I move?`;
+      const userPrompt = `${roach.persona.goal}\n${roach.persona.prompt}\nThe player is ${relativePosition}.\nWhich direction will you move?`;
       console.log(userPrompt);
       setGameLog(prev => [`Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`, ...prev].slice(0, 100));
       const direction = await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt);
@@ -248,7 +248,13 @@ function HomeScreen() {
             <ContentButton text="Zoom Out" onClick={zoomOut} /></p>
             {response}
           </div>
-          <div className={styles.notificationArea}>
+          <div
+            className={styles.notificationArea}
+            style={{
+              minHeight: '12em', // Adjust as needed for ~10 messages
+              fontSize: '0.8rem',
+              fontFamily: 'system-ui, sans-serif'
+            }}>
             {gameLog.map((msg, index) => (
               <p key={index}>{msg}</p>
             ))}

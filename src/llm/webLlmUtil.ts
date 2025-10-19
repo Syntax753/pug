@@ -48,6 +48,9 @@ export async function webLlmConnect(modelId:string, connection:LLMConnection, on
 }
 
 export async function webLlmGenerate(connection:LLMConnection, llmMessages:LLMMessages, prompt:string, onStatusUpdate:StatusUpdateCallback, navigatorMode:boolean):Promise<string> {
+  
+  console.log("LLM Prompt: "+prompt);
+
   const engine = connection.webLLMEngine;
   if (!engine) throw Error('Unexpected');
 
@@ -59,7 +62,7 @@ export async function webLlmGenerate(connection:LLMConnection, llmMessages:LLMMe
     messages,
     temperature: navigatorMode ? 0.0 : 0.7,
   };
-  addUserMessageToChatHistory(llmMessages, prompt);
+  // addUserMessageToChatHistory(llmMessages, prompt);
   
   const asyncChunkGenerator = await engine.chat.completions.create(request);
   let messageText = '';
@@ -72,6 +75,6 @@ export async function webLlmGenerate(connection:LLMConnection, llmMessages:LLMMe
   messageText = await engine.getMessage();
   
   onStatusUpdate(messageText, 1);
-  addAssistantMessageToChatHistory(llmMessages, messageText);
+  // addAssistantMessageToChatHistory(llmMessages, messageText);
   return messageText;
 }
