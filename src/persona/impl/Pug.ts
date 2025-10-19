@@ -9,6 +9,8 @@ class Pug implements Persona {
         South: pugImage,
         West: pugImage,
     };
+    public goal: string = "";
+    public prompt: string = "";
 }
 
 export default Pug;

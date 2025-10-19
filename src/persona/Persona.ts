@@ -8,4 +8,6 @@ export interface Avatar {
 export default interface Persona {
     isPlayer: boolean;
     avatar: Avatar;
+    goal: string;
+    prompt: string;
 }
