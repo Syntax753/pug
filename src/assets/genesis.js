@@ -45,7 +45,7 @@ async function splitTiles() {
             height: TILE_HEIGHT,
           })
           .toFile(outputFile);
-          exit();
+          // exit();
       }
     }
 
