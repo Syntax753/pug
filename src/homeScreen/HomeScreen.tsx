@@ -5,7 +5,7 @@ import ContentButton from '@/components/contentButton/ContentButton';
 import LoadScreen from '@/loadScreen/LoadScreen';
 import TopBar from '@/components/topBar/TopBar';
 import Grid from '@/components/grid/Grid';
-import GridData from '@/components/grid/GridData';
+import GridData from '@/components/gridData/GridData';
 import { GENERATING, submitPrompt } from '@/homeScreen/interactions/prompt';
 import { Entity } from '@/persona/types';
 import styles from '@/homeScreen/HomeScreen.module.css';
@@ -29,7 +29,13 @@ function loadGrid(width: number, height: number, seed: number): number[][] {
     for (let x = 0; x < width; x++) {
       const scale = 0.2;
       const noiseValue = simpleNoise(x * scale, y * scale, seed);
-      newGrid[y][x] = noiseValue > 0.5 ? 1 : 6;
+      if (noiseValue < 0.33) {
+        newGrid[y][x] = 1;
+      } else if (noiseValue < 0.66) {
+        newGrid[y][x] = 6;
+      } else {
+        newGrid[y][x] = 12;
+      }
     }
   }
   return newGrid;

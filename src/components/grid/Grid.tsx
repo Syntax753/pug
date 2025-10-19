@@ -1,6 +1,8 @@
-import grassImage1 from '@/assets/layer0/tile_1.png';
-import grassImage6 from '@/assets/layer0/tile_6.png';
 import styles from '@/homeScreen/HomeScreen.module.css';
+
+import Tile1 from '@/assets/layer0/tile_1.png';
+import Tile6 from '@/assets/layer0/tile_6.png';
+import Tile12 from '@/assets/layer0/tile_12.png';
 import Pug from '@/persona/impl/Pug';
 import Roach from '@/persona/impl/Roach';
 
@@ -16,8 +18,9 @@ const pug = new Pug();
 const roach = new Roach();
 
 const tileMapping: { [key: number]: string | undefined } = {
-  1: grassImage1,
-  6: grassImage6,
+  1: Tile1,
+  6: Tile6,
+  12: Tile12,
 };
 
 const entityMapping: { [key: number]: string | undefined } = {
@@ -37,13 +40,18 @@ function Grid({ layer0, entityGrid, width, height, tileSize }: GridProps) {
     <div className={styles.gridContainer} style={gridStyle}>
       {layer0.map((row, rowIndex) => (
         row.map((_, colIndex) => {
-          const baseTileImage = tileMapping[layer0[rowIndex][colIndex]];
+          const bgValue = layer0[rowIndex][colIndex];
+          const bgImage = tileMapping[bgValue];
+
           const entityValue = entityGrid[rowIndex][colIndex];
           const entityImage = entityMapping[entityValue];
 
+          // console.log(`Rendering cell at (${rowIndex}, ${colIndex}): backgroundTile=${backgroundTile}, entityImage=${entityImage}`);
+
           return (
             <div key={`${rowIndex}-${colIndex}`} className={styles.gridCell}>
-              {baseTileImage && <img src={baseTileImage} className={styles.tileImage} alt="" />}
+              {/* {backgroundTile && <img src={backgroundTile} className={styles.tileImage} alt="background" />} */}
+              {bgImage && <img src={bgImage} className={styles.tileImage} alt="background" />}
               {entityImage && <img src={entityImage} className={styles.entityImage} alt="entity" />}
             </div>
           );
