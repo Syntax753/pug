@@ -14,8 +14,9 @@ import Roach from '@/persona/impl/Roach';
 import RoachMother from '@/persona/impl/RoachMother';
 
 const SYSTEM_PROMPT = "You are an expert system that gives directions - you must only respond with a single direction from up, down, left or right.";
-const GRID_WIDTH = 20;
-const GRID_HEIGHT = 17;
+const GRID_WIDTH = 7;
+const GRID_HEIGHT = 7;
+
 
 // Simple noise function to create clusters
 function simpleNoise(x: number, y: number, seed: number = 0): number {
@@ -25,12 +26,12 @@ function simpleNoise(x: number, y: number, seed: number = 0): number {
   return (1.0 - ((x1 * (x1 * x1 * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0);
 }
 
-function loadGrid(width: number, height: number, seed: number): number[][] {
+function loadGrid(width: number, height: number, seed: number): number[][] {  
+  const NOISE_SCALE = 0.2;
   const newGrid = Array(height).fill(0).map(() => Array(width).fill(0));
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const scale = 0.2;
-      const noiseValue = simpleNoise(x * scale, y * scale, seed);
+      const noiseValue = simpleNoise(x * NOISE_SCALE, y * NOISE_SCALE, seed);
       if (noiseValue < 0.33) {
         newGrid[y][x] = 1;
       } else if (noiseValue < 0.66) {
@@ -54,38 +55,40 @@ function getCurrentTime(): string {
 function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [prompt, setPrompt] = useState<string>('');
-  const [responseText, setResponseText] = useState<string>('');
-  const [tileSize, setTileSize] = useState<number>(32);
+  const [responseText, setResponseText] = useState<string>('');  
+  const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth / GRID_WIDTH));
   const [gameLog, setGameLog] = useState<string[]>([]);
   const [turn, setTurn] = useState<number>(0);
   const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
 
+
   useEffect(() => {
-    // Prevent scrolling on the page
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = 'auto'; // Restore scrolling on component unmount
+    const handleResize = () => {
+      setTileSize(Math.floor(window.innerWidth / GRID_WIDTH));
     };
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial calculation
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const [entities, setEntities] = useState<Entity[]>([
     { id: 1, type: 'pug', persona: new Pug(), position: { x: 1, y: 1 } },
-    { id: 2, type: 'roach', persona: new Roach(), position: { x: 10, y: 10 } },
-    { id: 3, type: 'roach', persona: new Roach(), position: { x: 11, y: 10 } },
-    { id: 4, type: 'roachMother', persona: new RoachMother(), position: { x: 3, y: 3 } },
+    { id: 2, type: 'roach', persona: new Roach(), position: { x: 3, y: 3 } },
+    { id: 3, type: 'roach', persona: new Roach(), position: { x: 4, y: 4 } },
+    { id: 4, type: 'roachMother', persona: new RoachMother(), position: { x: 3, y: 1 } },
   ]);   
 
   const [entityGrid, setEntityGrid] = useState<(string | number)[][]>(() => {
-    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
+    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));  
     return newGrid;
   });
 
   // Generate a random seed once per component instance to vary the grass pattern
   const seed = useMemo(() => Math.random() * 1000, []);
 
-  const [layer0] = useState<number[][]>(() => {
+  const layer0 = useMemo<number[][]>(() => {
     return loadGrid(GRID_WIDTH, GRID_HEIGHT, seed);
-  });
+  }, [GRID_WIDTH, GRID_HEIGHT, seed]);
 
   // This effect synchronizes the entityGrid with the entities' positions
   useEffect(() => {
