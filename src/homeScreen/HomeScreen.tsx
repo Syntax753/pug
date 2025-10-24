@@ -13,7 +13,21 @@ import Pug from '@/persona/impl/Pug';
 import Roach from '@/persona/impl/Roach';
 import RoachMother from '@/persona/impl/RoachMother';
 
-const SYSTEM_PROMPT = "You are an expert system that gives directions - you must only respond with a single direction from up, down, left or right.";
+const SYSTEM_PROMPT = `You are an AI controlling enemies in a turn-based grid game. This is a single turn. After all enemies have moved one square, the player will have their turn.
+
+On the grid, the player is 'pug', enemies are 'roach' or 'roachMother', and '*' is an open space.
+
+Enemy goals for this turn:
+- 'roach': Move one square towards the 'pug', preferring vertical movement.
+- 'roachMother': Move one square away from the 'pug'.
+
+Rules:
+- Each enemy can only move a maximum of one square (up, down, left, or right) into an adjacent '*' space.
+- Enemies cannot move into spaces occupied by other entities.
+- Do not move the 'pug'.
+
+You will be given the current grid state. Your task is to return a new grid of the same size showing the new positions for ALL enemies for this single turn. Only output the new grid.
+`;
 const GRID_WIDTH = 15;
 const GRID_HEIGHT = 9;
 
@@ -115,73 +129,67 @@ function HomeScreen() {
   }, [isLoading, turn]);
 
   const executeTurn = async (playerDirection: 'up' | 'down' | 'left' | 'right') => {
-    setAwaitingPlayerInput(false);
-    const intendedMoves: { entity: Entity, newPosition: Position }[] = [];
     setGameLog(prev => [`${getCurrentTime()} Player move: ${playerDirection}`, ...prev].slice(0, 100));
-
-    // 1. Calculate player's intended move
+  
+    // 1. Calculate player's new position
     const player = entities.find(e => e.type === 'pug');
     if (!player) return;
-    let { x: playerX, y: playerY } = player.position;
-    if (playerDirection === 'up') playerY--;
-    else if (playerDirection === 'down') playerY++;
-    else if (playerDirection === 'left') playerX--;
-    else if (playerDirection === 'right') playerX++;
-    intendedMoves.push({ entity: player, newPosition: { x: playerX, y: playerY } });
-
-    // 2. Calculate NPC moves sequentially, ordered by ID
-    const npcs = entities.filter(e => !e.persona.isPlayer).sort((a, b) => a.id - b.id);
-    const playerPosition = player.position;
-
-    for (const npc of npcs) {
-      setGameLog(prev => [`${getCurrentTime()} Awaiting ${npc.type} #${npc.id} move...`, ...prev].slice(0, 100));
-      let { x, y } = npc.position;
-
-      // LLM-driven movement
-      const deltaX = playerPosition.x - npc.position.x;
-      const deltaY = playerPosition.y - npc.position.y;
-
-      const horizontal = deltaX > 0 ? `${deltaX} steps right` : deltaX < 0 ? `${Math.abs(deltaX)} steps left` : '';
-      const vertical = deltaY > 0 ? `${deltaY} steps down` : deltaY < 0 ? `${Math.abs(deltaY)} steps up` : '';
-
-      let relativePosition = [vertical, horizontal].filter(Boolean).join(' and ');
-      if (!relativePosition) relativePosition = 'at your location';
-
-      const userPrompt = `${npc.persona.goal}\n${npc.persona.prompt}\nThe pug is ${relativePosition}.\nWhich direction will you move?`;
-      //setGameLog(prev => [`Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`, ...prev].slice(0, 100));
-      const direction = (await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt)).toLowerCase();
-      // setGameLog(prev => [`${getCurrentTime()} Response from LLM: ${direction}`, ...prev].slice(0, 100));
-
-      // Translate direction to position change
-      if (direction.toLowerCase().includes('up')) y--;
-      else if (direction.toLowerCase().includes('down ')) y++;
-      else if (direction.toLowerCase().includes('left')) x--;
-      else if (direction.toLowerCase().includes('right')) x++;
-      setGameLog(prev => [`${getCurrentTime()} ${npc.type} intends to move: ${direction}`, ...prev].slice(0, 100));
-
-      intendedMoves.push({ entity: npc, newPosition: { x, y } });
-    }
-
-    // 3. Apply all moves simultaneously
-    setEntities(prevEntities => {
-      return prevEntities.map(e => {
-        const move = intendedMoves.find(m => m.entity.id === e.id);
-        console.log("Enemy move: ", e.id, move);
-        if (move) {
-          if (
-            move.newPosition.x >= 0 && move.newPosition.x < GRID_WIDTH &&
-            move.newPosition.y >= 0 && move.newPosition.y < GRID_HEIGHT
-          ) {
-            return { ...e, position: move.newPosition };
+    let newPlayerPos = { ...player.position };
+    if (playerDirection === 'up') newPlayerPos.y--;
+    else if (playerDirection === 'down') newPlayerPos.y++;
+    else if (playerDirection === 'left') newPlayerPos.x--;
+    else if (playerDirection === 'right') newPlayerPos.x++;
+  
+    // 2. Prepare grid for LLM
+    const gridForLlm = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill('*'));
+    entities.forEach(e => {
+      gridForLlm[e.position.y][e.position.x] = e.type;
+    });
+    const userPrompt = "Here is the current grid:\n" + gridForLlm.map(row => row.join(' ')).join('\n');
+  
+    setGameLog(prev => [`${getCurrentTime()} Awaiting enemy moves...`, ...prev].slice(0, 100));
+    const llmResponse = await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt);
+    setGameLog(prev => [`${getCurrentTime()} Enemies have moved.`, ...prev].slice(0, 100));
+  
+    // 3. Parse LLM response and create new entity list
+    const newGridFromLlm = llmResponse.split('\n').map(row => row.split(' '));
+    setGameLog(prev => [
+      `${getCurrentTime()} LLM response grid:`,
+      ...newGridFromLlm.map(row => row.join(' ')),
+      ...prev
+    ].slice(0, 100));
+    const newEntities: Entity[] = [];
+    const unplacedEnemies = entities.filter(e => !e.persona.isPlayer);
+  
+    for (let y = 0; y < GRID_HEIGHT; y++) {
+      for (let x = 0; x < GRID_WIDTH; x++) {
+        const cell = newGridFromLlm[y]?.[x];
+        if (cell && cell !== '*') {
+          const enemyIndex = unplacedEnemies.findIndex(e => e.type === cell);
+          if (enemyIndex !== -1) {
+            const enemy = unplacedEnemies.splice(enemyIndex, 1)[0];
+            newEntities.push({ ...enemy, position: { x, y } });
           }
         }
-        return e;
-      });
+      }
+    }
+  
+    // Add player to the new entity list
+    newEntities.push({ ...player, position: newPlayerPos });
+  
+    // Add any enemies that the LLM failed to place back in their original positions
+    unplacedEnemies.forEach(enemy => newEntities.push(enemy));
+  
+    // 4. Apply all moves simultaneously
+    setEntities(prevEntities => {
+      return newEntities.map(newEntity => {
+        const oldEntity = prevEntities.find(e => e.id === newEntity.id);
+        return oldEntity ? { ...oldEntity, position: newEntity.position } : newEntity;
+      }).sort((a, b) => a.id - b.id);
     });
-
-    // 4. Log results and end turn
+  
+    // 5. End turn
     setTurn(t => t + 1);
-    setAwaitingPlayerInput(true);
   };
 
   useEffect(() => {
@@ -197,9 +205,6 @@ function HomeScreen() {
         else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') direction = 'right';
         else return; // Not a movement key
 
-        setAwaitingPlayerInput(false);
-        executeTurn(direction);
-        
         if (direction) {
           e.preventDefault(); // Prevent default browser action (scrolling)
           setAwaitingPlayerInput(false);
