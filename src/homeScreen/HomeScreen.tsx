@@ -55,8 +55,8 @@ function getCurrentTime(): string {
 function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [prompt, setPrompt] = useState<string>('');
-  const [responseText, setResponseText] = useState<string>('');  
-  const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth / GRID_WIDTH));
+  const [responseText, setResponseText] = useState<string>('');
+  const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth * 0.8 / GRID_WIDTH));
   const [gameLog, setGameLog] = useState<string[]>([]);
   const [turn, setTurn] = useState<number>(0);
   const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
@@ -64,7 +64,7 @@ function HomeScreen() {
 
   useEffect(() => {
     const handleResize = () => {
-      setTileSize(Math.floor(window.innerWidth / GRID_WIDTH));
+      setTileSize(Math.floor(window.innerWidth * 0.8 / GRID_WIDTH));
     };
     window.addEventListener('resize', handleResize);
     handleResize(); // Initial calculation
@@ -88,7 +88,7 @@ function HomeScreen() {
 
   const layer0 = useMemo<number[][]>(() => {
     return loadGrid(GRID_WIDTH, GRID_HEIGHT, seed);
-  }, [GRID_WIDTH, GRID_HEIGHT, seed]);
+  }, [seed]);
 
   // This effect synchronizes the entityGrid with the entities' positions
   useEffect(() => {
