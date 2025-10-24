@@ -29,9 +29,7 @@ const tileMapping: { [key: number]: string | undefined } = {
 function Grid({ layer0, entityGrid, width, height, tileSize }: GridProps) {
   const gridStyle = {
     gridTemplateColumns: `repeat(${width}, 1fr)`,
-    gridTemplateRows: `repeat(${height}, 1fr)`,
     width: `${width * tileSize}px`,
-    height: `${height * tileSize}px`,
   };
 
   const entityImageMapping: { [key: string]: string } = {
