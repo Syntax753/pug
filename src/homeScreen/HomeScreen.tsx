@@ -14,8 +14,8 @@ import Roach from '@/persona/impl/Roach';
 import RoachMother from '@/persona/impl/RoachMother';
 
 const SYSTEM_PROMPT = "You are an expert system that gives directions - you must only respond with a single direction from up, down, left or right.";
-const GRID_WIDTH = 7;
-const GRID_HEIGHT = 7;
+const GRID_WIDTH = 15;
+const GRID_HEIGHT = 9;
 
 
 // Simple noise function to create clusters
@@ -199,6 +199,12 @@ function HomeScreen() {
 
         setAwaitingPlayerInput(false);
         executeTurn(direction);
+        
+        if (direction) {
+          e.preventDefault(); // Prevent default browser action (scrolling)
+          setAwaitingPlayerInput(false);
+          executeTurn(direction);
+        }
       }
     };
 
