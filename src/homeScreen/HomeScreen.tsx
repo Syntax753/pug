@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useReducer } from "react";
 
 import WaitingEllipsis from '@/components/waitingEllipsis/WaitingEllipsis';
 import ContentButton from '@/components/contentButton/ContentButton';
 import LoadScreen from '@/loadScreen/LoadScreen';
 import TopBar from '@/components/topBar/TopBar';
 import Grid from '@/components/grid/Grid';  
+import { gameReducer, initState } from './gameLogic';
 import { GENERATING, submitPrompt, SYSTEM_MESSAGE } from '@/homeScreen/interactions/prompt';
 import { getLLMNavigatorMove } from '@/homeScreen/interactions/game';
 import { Entity, Position } from '@/persona/types';
@@ -28,8 +29,8 @@ Rules:
 
 You will be given the current grid state. Your task is to return a new grid of the same size showing the new positions for ALL enemies for this single turn. Only output the new grid.
 `;
-const GRID_WIDTH = 15;
-const GRID_HEIGHT = 9;
+export const GRID_WIDTH = 15;
+export const GRID_HEIGHT = 9;
 
 
 // Simple noise function to create clusters
@@ -58,22 +59,11 @@ function loadGrid(width: number, height: number, seed: number): number[][] {
   return newGrid;
 }
 
-function getCurrentTime(): string {
-  const now = new Date();
-  const hours = now.getHours().toString().padStart(2, '0');
-  const minutes = now.getMinutes().toString().padStart(2, '0');
-  const seconds = now.getSeconds().toString().padStart(2, '0');
-  return `${hours}:${minutes}:${seconds}`;
-}
-
 function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [prompt, setPrompt] = useState<string>('');
   const [responseText, setResponseText] = useState<string>('');
   const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth * 0.8 / GRID_WIDTH));
-  const [gameLog, setGameLog] = useState<string[]>([]);
-  const [turn, setTurn] = useState<number>(0);
-  const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
 
 
   useEffect(() => {
@@ -85,17 +75,15 @@ function HomeScreen() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const [entities, setEntities] = useState<Entity[]>([
+  const initialEntities: Entity[] = useMemo(() => [
     { id: 1, type: 'pug', persona: new Pug(), position: { x: 1, y: 1 } },
     { id: 2, type: 'roach', persona: new Roach(), position: { x: 3, y: 3 } },
     { id: 3, type: 'roach', persona: new Roach(), position: { x: 4, y: 4 } },
     { id: 4, type: 'roachMother', persona: new RoachMother(), position: { x: 3, y: 1 } },
-  ]);   
+  ], []);
 
-  const [entityGrid, setEntityGrid] = useState<(string | number)[][]>(() => {
-    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));  
-    return newGrid;
-  });
+  const [gameState, dispatch] = useReducer(gameReducer, initialEntities, initState);
+  const { turn, entities, entityGrid, gameLog, awaitingPlayerInput } = gameState;
 
   // Generate a random seed once per component instance to vary the grass pattern
   const seed = useMemo(() => Math.random() * 1000, []);
@@ -104,33 +92,19 @@ function HomeScreen() {
     return loadGrid(GRID_WIDTH, GRID_HEIGHT, seed);
   }, [seed]);
 
-  // This effect synchronizes the entityGrid with the entities' positions
-  useEffect(() => {
-    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
-    for (const entity of entities) {
-      newGrid[entity.position.y][entity.position.x] = entity.type;
-    }
-    setEntityGrid(newGrid);
-  }, [entities]);
-
   useEffect(() => {
     if (isLoading) return;
 
     // Game Loop
-    const runGameTurn = () => {
-      setGameLog(prev => [`${getCurrentTime()} Awaiting player move (use arrows or WASD)`, `${getCurrentTime()} Start turn ${turn + 1}`, ...prev].slice(0, 100));
-      // Player's turn
-      setAwaitingPlayerInput(true);
-      // The rest of the turn logic will be triggered by player input in the other useEffect
-    };
-
-    runGameTurn();
-    // The main game loop is now event-driven by player input, so no timeout is needed here.
-  }, [isLoading, turn]);
+    if (turn === 0 || !awaitingPlayerInput) {
+      dispatch({ type: 'START_TURN' });
+    }
+  }, [isLoading, turn, awaitingPlayerInput]);
 
   const executeTurn = async (playerDirection: 'up' | 'down' | 'left' | 'right') => {
-    setGameLog(prev => [`${getCurrentTime()} Player move: ${playerDirection}`, ...prev].slice(0, 100));
+    dispatch({ type: 'LOG_MESSAGE', payload: `Player move: ${playerDirection}` });
   
+    // --- Player's Turn ---
     // 1. Calculate player's new position
     const player = entities.find(e => e.type === 'pug');
     if (!player) return;
@@ -140,26 +114,30 @@ function HomeScreen() {
     else if (playerDirection === 'left') newPlayerPos.x--;
     else if (playerDirection === 'right') newPlayerPos.x++;
   
+    // Apply player's move
+    const entitiesAfterPlayerMove = entities.map(e => e.id === player.id ? { ...player, position: newPlayerPos } : e);
+    dispatch({ type: 'PLAYER_MOVE', payload: { newEntities: entitiesAfterPlayerMove } });
+
+    // --- Enemy's Turn (pass the next state to the LLM) ---
     // 2. Prepare grid for LLM
     const gridForLlm = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill('*'));
-    entities.forEach(e => {
+    entitiesAfterPlayerMove.forEach(e => {
       gridForLlm[e.position.y][e.position.x] = e.type;
     });
     const userPrompt = "Here is the current grid:\n" + gridForLlm.map(row => row.join(' ')).join('\n');
   
-    setGameLog(prev => [`${getCurrentTime()} Awaiting enemy moves...`, ...prev].slice(0, 100));
+    dispatch({ type: 'LOG_MESSAGE', payload: 'Awaiting enemy moves...' });
     const llmResponse = await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt);
-    setGameLog(prev => [`${getCurrentTime()} Enemies have moved.`, ...prev].slice(0, 100));
+    dispatch({ type: 'LOG_MESSAGE', payload: 'Enemies have moved.' });
   
     // 3. Parse LLM response and create new entity list
     const newGridFromLlm = llmResponse.split('\n').map(row => row.split(' '));
-    setGameLog(prev => [
-      `${getCurrentTime()} LLM response grid:`,
+    dispatch({ type: 'LOG_MESSAGE', payload: [
+      `LLM response grid:`,
       ...newGridFromLlm.map(row => row.join(' ')),
-      ...prev
-    ].slice(0, 100));
+    ]});
     const newEntities: Entity[] = [];
-    const unplacedEnemies = entities.filter(e => !e.persona.isPlayer);
+    const unplacedEnemies = entitiesAfterPlayerMove.filter(e => !e.persona.isPlayer);
   
     for (let y = 0; y < GRID_HEIGHT; y++) {
       for (let x = 0; x < GRID_WIDTH; x++) {
@@ -175,21 +153,14 @@ function HomeScreen() {
     }
   
     // Add player to the new entity list
-    newEntities.push({ ...player, position: newPlayerPos });
+    newEntities.push({ ...player, position: newPlayerPos }); // The player position is from before the enemy turn
   
     // Add any enemies that the LLM failed to place back in their original positions
     unplacedEnemies.forEach(enemy => newEntities.push(enemy));
   
     // 4. Apply all moves simultaneously
-    setEntities(prevEntities => {
-      return newEntities.map(newEntity => {
-        const oldEntity = prevEntities.find(e => e.id === newEntity.id);
-        return oldEntity ? { ...oldEntity, position: newEntity.position } : newEntity;
-      }).sort((a, b) => a.id - b.id);
-    });
-  
-    // 5. End turn
-    setTurn(t => t + 1);
+    const sortedEntities = newEntities.sort((a, b) => a.id - b.id);
+    dispatch({ type: 'ENEMY_TURN', payload: { newEntities: sortedEntities } });
   };
 
   useEffect(() => {
@@ -207,7 +178,7 @@ function HomeScreen() {
 
         if (direction) {
           e.preventDefault(); // Prevent default browser action (scrolling)
-          setAwaitingPlayerInput(false);
+          dispatch({ type: 'SET_AWAITING_INPUT', payload: false });
           executeTurn(direction);
         }
       }
