@@ -14,20 +14,22 @@ import Pug from '@/persona/impl/Pug';
 import Roach from '@/persona/impl/Roach';
 import RoachMother from '@/persona/impl/RoachMother';
 
-const SYSTEM_PROMPT = `You are an AI controlling enemies in a turn-based grid game. This is a single turn. After all enemies have moved one square, the player will have their turn.
+const SYSTEM_PROMPT = `You are an AI controlling enemies in a turn-based grid game.
 
-On the grid, the player is 'pug', enemies are 'roach' or 'roachMother', and '*' is an open space.
+You will be given a JSON array of objects, where each object represents an enemy with its type and its position relative to the player ('pug').
+For example: \`[{ "type": "roach", "relative_pos": }, { "type": "roachMother", "relative_pos": [-1, 4] }]\`
+This means the 'roach' is 3 squares right and 2 squares down from the pug, and the 'roachMother' is 1 square left and 4 squares down.
 
 Enemy goals for this turn:
-- 'roach': Move one square towards the 'pug', preferring vertical movement.
-- 'roachMother': Move one square away from the 'pug'.
+- 'roach': Move one square closer to the 'pug' (0,0).
+- 'roachMother': Move one square further away from the 'pug' (0,0).
 
 Rules:
-- Each enemy can only move a maximum of one square (up, down, left, or right) into an adjacent '*' space.
+- Each enemy can only move one square (up, down, left, or right).
 - Enemies cannot move into spaces occupied by other entities.
 - Do not move the 'pug'.
 
-You will be given the current grid state. Your task is to return a new grid of the same size showing the new positions for ALL enemies for this single turn. Only output the new grid.
+Your task is to return a new JSON array with the new relative positions for ALL enemies for this single turn. Only output the JSON array.
 `;
 export const GRID_WIDTH = 15;
 export const GRID_HEIGHT = 9;
@@ -120,43 +122,49 @@ function HomeScreen() {
 
     // --- Enemy's Turn (pass the next state to the LLM) ---
     // 2. Prepare grid for LLM
-    const gridForLlm = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill('*'));
-    entitiesAfterPlayerMove.forEach(e => {
-      gridForLlm[e.position.y][e.position.x] = e.type;
-    });
-    const userPrompt = "Here is the current grid:\n" + gridForLlm.map(row => row.join(' ')).join('\n');
+    const playerAfterMove = entitiesAfterPlayerMove.find(e => e.type === 'pug');
+    if (!playerAfterMove) return;
+
+    const enemyRelativePositions = entitiesAfterPlayerMove
+      .filter(e => !e.persona.isPlayer)
+      .map(enemy => ({
+        type: enemy.type,
+        relative_pos: [
+          enemy.position.x - playerAfterMove.position.x,
+          enemy.position.y - playerAfterMove.position.y,
+        ],
+      }));
+
+    const userPrompt = JSON.stringify(enemyRelativePositions);
   
     dispatch({ type: 'LOG_MESSAGE', payload: 'Awaiting enemy moves...' });
     const llmResponse = await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt);
     dispatch({ type: 'LOG_MESSAGE', payload: 'Enemies have moved.' });
   
     // 3. Parse LLM response and create new entity list
-    const newGridFromLlm = llmResponse.split('\n').map(row => row.split(' '));
-    dispatch({ type: 'LOG_MESSAGE', payload: [
-      `LLM response grid:`,
-      ...newGridFromLlm.map(row => row.join(' ')),
-    ]});
+    const newRelativePositions = JSON.parse(llmResponse);
+    dispatch({ type: 'LOG_MESSAGE', payload: `LLM response: ${llmResponse}` });
+
     const newEntities: Entity[] = [];
-    const unplacedEnemies = entitiesAfterPlayerMove.filter(e => !e.persona.isPlayer);
+    const enemiesToMove = entitiesAfterPlayerMove.filter(e => !e.persona.isPlayer);
   
-    for (let y = 0; y < GRID_HEIGHT; y++) {
-      for (let x = 0; x < GRID_WIDTH; x++) {
-        const cell = newGridFromLlm[y]?.[x];
-        if (cell && cell !== '*') {
-          const enemyIndex = unplacedEnemies.findIndex(e => e.type === cell);
-          if (enemyIndex !== -1) {
-            const enemy = unplacedEnemies.splice(enemyIndex, 1)[0];
-            newEntities.push({ ...enemy, position: { x, y } });
-          }
-        }
+    for (let i = 0; i < newRelativePositions.length; i++) {
+      const enemyData = newRelativePositions[i];
+      const originalEnemy = enemiesToMove[i]; // Match by index
+      if (originalEnemy && originalEnemy.type === enemyData.type) {
+        const newPosition = {
+          x: playerAfterMove.position.x + enemyData.relative_pos[0],
+          y: playerAfterMove.position.y + enemyData.relative_pos[1],
+        };
+        newEntities.push({ ...originalEnemy, position: newPosition });
       }
     }
   
     // Add player to the new entity list
-    newEntities.push({ ...player, position: newPlayerPos }); // The player position is from before the enemy turn
+    if (playerAfterMove) newEntities.push(playerAfterMove);
   
     // Add any enemies that the LLM failed to place back in their original positions
-    unplacedEnemies.forEach(enemy => newEntities.push(enemy));
+    // This logic is now handled by matching indices. If the LLM returns fewer enemies, they won't be moved.
   
     // 4. Apply all moves simultaneously
     const sortedEntities = newEntities.sort((a, b) => a.id - b.id);
