@@ -34,8 +34,6 @@ class Pug implements Persona {
             newY = myPosition.y;
         }
 
-        // Update future grid
-        futureGrid[newY][newX] = 'pug';
         return { x: newX, y: newY };
     }
 }

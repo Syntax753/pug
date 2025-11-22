@@ -106,10 +106,10 @@ function HomeScreen() {
 
   // Factory function for initial entities to ensure fresh instances on reset
   const getInitialEntities = (): Entity[] => [
-    { id: 1, type: 'pug', persona: new Pug(), position: { x: 2, y: 2 } },
-    { id: 2, type: 'roach', persona: new Roach(), position: { x: 4, y: 16 } },
-    { id: 3, type: 'roach', persona: new Roach(), position: { x: 14, y: 16 } },
-    { id: 4, type: 'roachMother', persona: new RoachMother(), position: { x: 16, y: 4 } },
+    { id: 1, type: 'pug', persona: new Pug(), position: { x: 2, y: 2 }, movementOrder: 0 },
+    { id: 2, type: 'roach', persona: new Roach(), position: { x: 4, y: 16 }, movementOrder: 1 },
+    { id: 3, type: 'roach', persona: new Roach(), position: { x: 14, y: 16 }, movementOrder: 2 },
+    { id: 4, type: 'roachMother', persona: new RoachMother(), position: { x: 16, y: 4 }, movementOrder: 3 },
   ];
 
   // Simplified entity state
@@ -193,10 +193,13 @@ function HomeScreen() {
     // We use 'nextEntities' which now has the updated player position
     const contextEntities = nextEntities.map(e => ({ ...e }));
 
-    // 3. Process moves for ENEMIES
-    for (const entity of nextEntities) {
-      if (entity.persona.isPlayer) continue; // Already moved
+    // 3. Process moves for ENEMIES in movement order
+    // Sort enemies by movementOrder to ensure deterministic execution
+    const enemies = nextEntities
+      .filter(e => !e.persona.isPlayer)
+      .sort((a, b) => a.movementOrder - b.movementOrder);
 
+    for (const entity of enemies) {
       const context: MoveContext = {
         entities: contextEntities, // Use the state where player has already moved
         myPosition: entity.position,
@@ -205,7 +208,18 @@ function HomeScreen() {
       };
 
       const newPos = entity.persona.move(context, futureGrid);
-      entity.position = newPos;
+
+      // Check if another entity is already at the new position in the future grid
+      const occupiedByEntity = futureGrid[newPos.y]?.[newPos.x];
+      if (occupiedByEntity && typeof occupiedByEntity === 'string') {
+        // Position is occupied, stay at current position
+        futureGrid[entity.position.y][entity.position.x] = entity.type;
+        // Don't update entity.position
+      } else {
+        // Position is free, move there
+        futureGrid[newPos.y][newPos.x] = entity.type;
+        entity.position = newPos;
+      }
     }
 
     setEntities(nextEntities);
@@ -303,15 +317,19 @@ function HomeScreen() {
       persona = new RoachMother();
     }
 
+    // Find the highest movement order and assign the next one
+    const maxMovementOrder = entities.reduce((max, e) => Math.max(max, e.movementOrder), -1);
+
     const newEnemy: Entity = {
       id: Date.now(),
       type: type,
       position: { x: 8, y: 8 }, // Default spawn
-      persona: persona
+      persona: persona,
+      movementOrder: maxMovementOrder + 1
     };
 
     setEntities(prev => [...prev, newEnemy]);
-    setGameLog(prev => [`${getCurrentTime()} Added new enemy '${newEnemy.type}'`, ...prev].slice(0, 100));
+    setGameLog(prev => [`${getCurrentTime()} Added new enemy '${newEnemy.type}' (order ${newEnemy.movementOrder})`, ...prev].slice(0, 100));
   };
 
   return (

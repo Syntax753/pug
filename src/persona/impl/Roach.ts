@@ -30,8 +30,12 @@ class Roach implements Persona {
                 if (x < 0 || x >= futureGrid[0].length || y < 0 || y >= futureGrid.length) {
                     return false;
                 }
-                // Obstacle check
+                // Obstacle check (walls)
                 if (context.layer1[y][x] === 92) {
+                    return false;
+                }
+                // Entity check (futureGrid)
+                if (futureGrid[y][x] !== 0) {
                     return false;
                 }
                 return true;
@@ -75,7 +79,6 @@ class Roach implements Persona {
             }
         }
 
-        futureGrid[newY][newX] = 'roach';
         return { x: newX, y: newY };
     }
 }

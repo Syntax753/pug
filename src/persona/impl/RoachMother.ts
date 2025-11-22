@@ -25,25 +25,32 @@ class RoachMother implements Persona {
             const dy = myPosition.y - pug.position.y;
 
             // Move away (allows diagonal)
-            if (dx !== 0) newX += Math.sign(dx);
-            else newX += (Math.random() > 0.5 ? 1 : -1); // If aligned, pick a random side direction
+            let tryX = newX;
+            let tryY = newY;
 
-            if (dy !== 0) newY += Math.sign(dy);
-            else newY += (Math.random() > 0.5 ? 1 : -1);
+            if (dx !== 0) tryX += Math.sign(dx);
+            else tryX += (Math.random() > 0.5 ? 1 : -1); // If aligned, pick a random side direction
+
+            if (dy !== 0) tryY += Math.sign(dy);
+            else tryY += (Math.random() > 0.5 ? 1 : -1);
+
+            // Simple bounds check
+            tryX = Math.max(0, Math.min(futureGrid[0].length - 1, tryX));
+            tryY = Math.max(0, Math.min(futureGrid.length - 1, tryY));
+
+            // Check for obstacles in layer1 OR futureGrid
+            if (context.layer1[tryY][tryX] !== 92 && futureGrid[tryY][tryX] === 0) {
+                newX = tryX;
+                newY = tryY;
+            } else {
+                // Blocked, try random cardinal move? Or just stay put for now as per simple AI
+                // For now, RoachMother just stays put if blocked, or we could add retry logic.
+                // Given the request was specifically about Roach logic (prefer vertical), 
+                // and RoachMother has different logic (fleeing), staying put is a safe default for now
+                // to avoid complex fleeing pathfinding in this step.
+            }
         }
 
-        // Simple bounds check
-        newX = Math.max(0, Math.min(futureGrid[0].length - 1, newX));
-        newY = Math.max(0, Math.min(futureGrid.length - 1, newY));
-
-        // Check for obstacles in layer1
-        if (context.layer1[newY][newX] === 92) {
-            // Blocked, stay at current position
-            newX = myPosition.x;
-            newY = myPosition.y;
-        }
-
-        futureGrid[newY][newX] = 'roachMother';
         return { x: newX, y: newY };
     }
 }
