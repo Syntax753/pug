@@ -11,7 +11,6 @@ interface GridProps {
   layer0: number[][];
   entityGrid: (string | number)[][];
   width: number;
-  height: number;
   tileSize: number;
 }
 
@@ -26,7 +25,7 @@ const tileMapping: { [key: number]: string | undefined } = {
 };
 
 
-function Grid({ layer0, entityGrid, width, height, tileSize }: GridProps) {
+function Grid({ layer0, entityGrid, width, tileSize }: GridProps) {
   const gridStyle = {
     gridTemplateColumns: `repeat(${width}, 1fr)`,
     width: `${width * tileSize}px`,
@@ -48,11 +47,8 @@ function Grid({ layer0, entityGrid, width, height, tileSize }: GridProps) {
           const entityType = entityGrid[rowIndex][colIndex];
           const entityImage = entityType ? entityImageMapping[entityType] : undefined;
 
-          // console.log(`Rendering cell at (${rowIndex}, ${colIndex}): backgroundTile=${backgroundTile}, entityImage=${entityImage}`);
-
           return (
             <div key={`${rowIndex}-${colIndex}`} className={styles.gridCell}>
-              {/* {backgroundTile && <img src={backgroundTile} className={styles.tileImage} alt="background" />} */}
               {bgImage && <img src={bgImage} className={styles.tileImage} alt="background" />}
               {entityImage && <img src={entityImage} className={styles.entityImage} alt="entity" />}
             </div>

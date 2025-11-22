@@ -1,4 +1,5 @@
-import Persona, { Avatar } from '../Persona';
+import Persona, { Avatar, MoveContext } from '../Persona';
+import { Position } from '../types';
 import roachImage from '@/assets/persona/roach.png';
 
 class Roach implements Persona {
@@ -11,6 +12,33 @@ class Roach implements Persona {
     };
     public goal: string = "You want to reach the pug.";
     public prompt: string = "You prefer vertical movement over horizontal movement.";
+
+    public move(context: MoveContext, futureGrid: (string | number)[][]): Position {
+        const { entities, myPosition } = context;
+        const pug = entities.find(e => e.type === 'pug');
+
+        let newX = myPosition.x;
+        let newY = myPosition.y;
+
+        if (pug) {
+            const dx = pug.position.x - myPosition.x;
+            const dy = pug.position.y - myPosition.y;
+
+            // Prefer vertical movement
+            if (Math.abs(dy) > 0) {
+                newY += Math.sign(dy);
+            } else if (Math.abs(dx) > 0) {
+                newX += Math.sign(dx);
+            }
+        }
+
+        // Simple bounds check
+        newX = Math.max(0, Math.min(futureGrid[0].length - 1, newX));
+        newY = Math.max(0, Math.min(futureGrid.length - 1, newY));
+
+        futureGrid[newY][newX] = 'roach';
+        return { x: newX, y: newY };
+    }
 }
 
 export default Roach;
