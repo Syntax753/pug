@@ -50,13 +50,30 @@ function generateLayer1(width: number, height: number, seed: number): number[][]
     return x - Math.floor(x);
   };
 
+  // Add walls in top right cluster (so pug can hide from enemies)
+  const topRightWalls = [
+    { x: 7, y: 0 }, { x: 8, y: 0 }, { x: 9, y: 0 },
+    { x: 7, y: 1 }, { x: 9, y: 1 },
+    { x: 7, y: 2 }
+  ];
+
+  for (const wall of topRightWalls) {
+    if (wall.x < width && wall.y < height) {
+      newGrid[wall.y][wall.x] = 92;
+    }
+  }
+
   let obstaclesPlaced = 0;
   while (obstaclesPlaced < 5) {
     const x = Math.floor(random() * width);
     const y = Math.floor(random() * height);
 
-    // Avoid initial entity positions (approximate check)
+    // Avoid initial entity positions
     if ((x === 1 && y === 1) || (x === 2 && y === 8) || (x === 7 && y === 8) || (x === 8 && y === 2)) {
+      continue;
+    }
+    // Avoid top right cluster
+    if (x >= 7 && y <= 2) {
       continue;
     }
 
@@ -135,7 +152,7 @@ function HomeScreen() {
     if (isLoading) return;
 
     const runGameTurn = () => {
-      setGameLog(prev => [`${getCurrentTime()} Turn ${turn + 1}. Awaiting player move (arrows/WASD).`, ...prev].slice(0, 100));
+      setGameLog(prev => [`${getCurrentTime()} Turn ${turn + 1}. Awaiting player move (arrows/WASD/numpad).`, ...prev].slice(0, 100));
       // Player's turn
       setAwaitingPlayerInput(true);
     };
@@ -143,11 +160,12 @@ function HomeScreen() {
     runGameTurn();
   }, [isLoading, turn]);
 
-  const executeTurn = async (playerDirection: 'up' | 'down' | 'left' | 'right') => {
+  const executeTurn = async (playerMove: { x: number, y: number }) => {
     // Save current state to history before moving
     setHistory(prev => [...prev, entities]);
 
-    setGameLog(prev => [`${getCurrentTime()} Player move: ${playerDirection}`, ...prev].slice(0, 100));
+    const moveDesc = playerMove.x === 0 && playerMove.y === 0 ? 'skip' : `(${playerMove.x}, ${playerMove.y})`;
+    setGameLog(prev => [`${getCurrentTime()} Player move: ${moveDesc}`, ...prev].slice(0, 100));
 
     // Initialize future grid (empty for entities)
     const futureGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
@@ -162,7 +180,7 @@ function HomeScreen() {
       const playerContext: MoveContext = {
         entities: entities,
         myPosition: playerEntity.position,
-        playerInput: playerDirection,
+        playerInput: playerMove,
         layer1: layer1
       };
       const newPlayerPos = playerEntity.persona.move(playerContext, futureGrid);
@@ -199,7 +217,7 @@ function HomeScreen() {
     setHistory([]);
     setTurn(0);
     setGameLog([]);
-    setAwaitingPlayerInput(false); // Will be set to true by the game loop effect
+    setAwaitingPlayerInput(true); // Enable player input immediately after reset
   };
 
   const handleUndo = () => {
@@ -228,17 +246,29 @@ function HomeScreen() {
         const player = entities.find(e => e.persona.isPlayer);
         if (!player) return;
 
-        let direction: 'up' | 'down' | 'left' | 'right' | null = null;
-        if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') direction = 'up';
-        else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') direction = 'down';
-        else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') direction = 'left';
-        else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') direction = 'right';
+        let moveVector: { x: number, y: number } | null = null;
+
+        // Arrow keys and WASD
+        if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') moveVector = { x: 0, y: -1 };
+        else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') moveVector = { x: 0, y: 1 };
+        else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') moveVector = { x: -1, y: 0 };
+        else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') moveVector = { x: 1, y: 0 };
+        // Numpad
+        else if (e.key === '1') moveVector = { x: -1, y: 1 };  // Down-left
+        else if (e.key === '2') moveVector = { x: 0, y: 1 };   // Down
+        else if (e.key === '3') moveVector = { x: 1, y: 1 };   // Down-right
+        else if (e.key === '4') moveVector = { x: -1, y: 0 };  // Left
+        else if (e.key === '5' || e.key === ' ') moveVector = { x: 0, y: 0 }; // Skip turn
+        else if (e.key === '6') moveVector = { x: 1, y: 0 };   // Right
+        else if (e.key === '7') moveVector = { x: -1, y: -1 }; // Up-left
+        else if (e.key === '8') moveVector = { x: 0, y: -1 };  // Up
+        else if (e.key === '9') moveVector = { x: 1, y: -1 };  // Up-right
         else return; // Not a movement key
 
-        if (direction) {
+        if (moveVector) {
           e.preventDefault(); // Prevent default browser action (scrolling)
           setAwaitingPlayerInput(false);
-          executeTurn(direction);
+          executeTurn(moveVector);
         }
       }
     };

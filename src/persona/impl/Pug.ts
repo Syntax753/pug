@@ -18,10 +18,10 @@ class Pug implements Persona {
         let newX = myPosition.x;
         let newY = myPosition.y;
 
-        if (playerInput === 'up') newY--;
-        else if (playerInput === 'down') newY++;
-        else if (playerInput === 'left') newX--;
-        else if (playerInput === 'right') newX++;
+        if (playerInput) {
+            newX += playerInput.x;
+            newY += playerInput.y;
+        }
 
         // Clamp to grid bounds
         newX = Math.max(0, Math.min(futureGrid[0].length - 1, newX));

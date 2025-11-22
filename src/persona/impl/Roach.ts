@@ -24,12 +24,9 @@ class Roach implements Persona {
             const dx = pug.position.x - myPosition.x;
             const dy = pug.position.y - myPosition.y;
 
-            // Prefer vertical movement
-            if (Math.abs(dy) > 0) {
-                newY += Math.sign(dy);
-            } else if (Math.abs(dx) > 0) {
-                newX += Math.sign(dx);
-            }
+            // Move towards pug (allows diagonal)
+            if (dx !== 0) newX += Math.sign(dx);
+            if (dy !== 0) newY += Math.sign(dy);
         }
 
         // Simple bounds check

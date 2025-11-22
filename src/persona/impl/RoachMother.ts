@@ -24,13 +24,12 @@ class RoachMother implements Persona {
             const dx = myPosition.x - pug.position.x; // Vector FROM pug
             const dy = myPosition.y - pug.position.y;
 
-            // Move away
-            if (Math.abs(dx) > Math.abs(dy)) {
-                newX += Math.sign(dx) || (Math.random() > 0.5 ? 1 : -1);
-                if (dx === 0 && dy === 0) newX++;
-            } else {
-                newY += Math.sign(dy) || (Math.random() > 0.5 ? 1 : -1);
-            }
+            // Move away (allows diagonal)
+            if (dx !== 0) newX += Math.sign(dx);
+            else newX += (Math.random() > 0.5 ? 1 : -1); // If aligned, pick a random side direction
+
+            if (dy !== 0) newY += Math.sign(dy);
+            else newY += (Math.random() > 0.5 ? 1 : -1);
         }
 
         // Simple bounds check

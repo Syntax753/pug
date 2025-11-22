@@ -10,7 +10,7 @@ export interface Avatar {
 export interface MoveContext {
     entities: Entity[];
     myPosition: Position;
-    playerInput?: string;
+    playerInput?: { x: number, y: number };
     layer1: number[][];
 }
 
