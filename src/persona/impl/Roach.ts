@@ -24,20 +24,55 @@ class Roach implements Persona {
             const dx = pug.position.x - myPosition.x;
             const dy = pug.position.y - myPosition.y;
 
-            // Move towards pug (allows diagonal)
-            if (dx !== 0) newX += Math.sign(dx);
-            if (dy !== 0) newY += Math.sign(dy);
-        }
+            // Helper function to check if a position is valid
+            const isValidMove = (x: number, y: number): boolean => {
+                // Bounds check
+                if (x < 0 || x >= futureGrid[0].length || y < 0 || y >= futureGrid.length) {
+                    return false;
+                }
+                // Obstacle check
+                if (context.layer1[y][x] === 92) {
+                    return false;
+                }
+                return true;
+            };
 
-        // Simple bounds check
-        newX = Math.max(0, Math.min(futureGrid[0].length - 1, newX));
-        newY = Math.max(0, Math.min(futureGrid.length - 1, newY));
+            // Try diagonal move first
+            let targetX = myPosition.x + (dx !== 0 ? Math.sign(dx) : 0);
+            let targetY = myPosition.y + (dy !== 0 ? Math.sign(dy) : 0);
 
-        // Check for obstacles in layer1
-        if (context.layer1[newY][newX] === 92) {
-            // Blocked, stay at current position
-            newX = myPosition.x;
-            newY = myPosition.y;
+            if (isValidMove(targetX, targetY)) {
+                newX = targetX;
+                newY = targetY;
+            } else {
+                // Diagonal blocked, try vertical first (prefer vertical over horizontal)
+                if (dy !== 0) {
+                    targetX = myPosition.x;
+                    targetY = myPosition.y + Math.sign(dy);
+                    if (isValidMove(targetX, targetY)) {
+                        newX = targetX;
+                        newY = targetY;
+                    } else if (dx !== 0) {
+                        // Vertical blocked, try horizontal
+                        targetX = myPosition.x + Math.sign(dx);
+                        targetY = myPosition.y;
+                        if (isValidMove(targetX, targetY)) {
+                            newX = targetX;
+                            newY = targetY;
+                        }
+                        // If all blocked, stay at current position (newX, newY unchanged)
+                    }
+                } else if (dx !== 0) {
+                    // Only horizontal movement needed
+                    targetX = myPosition.x + Math.sign(dx);
+                    targetY = myPosition.y;
+                    if (isValidMove(targetX, targetY)) {
+                        newX = targetX;
+                        newY = targetY;
+                    }
+                    // If blocked, stay at current position
+                }
+            }
         }
 
         futureGrid[newY][newX] = 'roach';
