@@ -1,17 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
+import { lua, lauxlib, lualib, to_luastring } from "fengari";
 
 import WaitingEllipsis from '@/components/waitingEllipsis/WaitingEllipsis';
 import ContentButton from '@/components/contentButton/ContentButton';
 import LoadScreen from '@/loadScreen/LoadScreen';
 import TopBar from '@/components/topBar/TopBar';
-import Grid from '@/components/grid/Grid';  
-import { GENERATING, submitPrompt, SYSTEM_MESSAGE } from '@/homeScreen/interactions/prompt';
-import { getLLMNavigatorMove } from '@/homeScreen/interactions/game';
+import Grid from '@/components/grid/Grid';
+import { GENERATING, submitPrompt } from "@/homeScreen/interactions/prompt";
 import { Entity, Position } from '@/persona/types';
 import styles from '@/homeScreen/HomeScreen.module.css';
 import Pug from '@/persona/impl/Pug';
-import Roach from '@/persona/impl/Roach';
-import RoachMother from '@/persona/impl/RoachMother';
+
+const LUA_GEN_SYSTEM_PROMPT = `
+You are an AI assistant that generates Lua scripts for enemy behavior in a grid-based game.
+The user will describe a monster and its behavior. You will translate this into a Lua script.
+The script must contain a 'move' function with the signature: function move(player, self, enemies)
+- 'player': A table with the player's position, e.g., { x = 1, y = 1 }.
+- 'self': A table with the current enemy's position, e.g., { x = 8, y = 8 }.
+- 'enemies': A list of tables for all other enemies, e.g., [ { x = 3, y = 4 } ].
+The 'move' function must return a table with the new x and y coordinates for the enemy.
+The enemy can only move one square in any cardinal direction (up, down, left, or right).
+Do not move diagonally. Do not stay in the same spot unless there are no valid moves.
+Ensure the new position is within the 10x10 grid (coordinates 0 to 9).
+Only output the raw Lua script. Do not include any extra text or markdown.
+`;
 
 const SYSTEM_PROMPT = `You are an AI controlling enemies in a turn-based grid game. This is a single turn. After all enemies have moved one square, the player will have their turn.
 
@@ -28,8 +40,8 @@ Rules:
 
 You will be given the current grid state. Your task is to return a new grid of the same size showing the new positions for ALL enemies for this single turn. Only output the new grid.
 `;
-const GRID_WIDTH = 15;
-const GRID_HEIGHT = 9;
+const GRID_WIDTH = 10;
+const GRID_HEIGHT = 10;
 
 
 // Simple noise function to create clusters
@@ -40,7 +52,7 @@ function simpleNoise(x: number, y: number, seed: number = 0): number {
   return (1.0 - ((x1 * (x1 * x1 * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0);
 }
 
-function loadGrid(width: number, height: number, seed: number): number[][] {  
+function loadGrid(width: number, height: number, seed: number): number[][] {
   const NOISE_SCALE = 0.2;
   const newGrid = Array(height).fill(0).map(() => Array(width).fill(0));
   for (let y = 0; y < height; y++) {
@@ -62,19 +74,15 @@ function getCurrentTime(): string {
   const now = new Date();
   const hours = now.getHours().toString().padStart(2, '0');
   const minutes = now.getMinutes().toString().padStart(2, '0');
-  const seconds = now.getSeconds().toString().padStart(2, '0');
-  return `${hours}:${minutes}:${seconds}`;
+  return `${hours}:${minutes}`;
 }
 
 function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [prompt, setPrompt] = useState<string>('');
-  const [responseText, setResponseText] = useState<string>('');
-  const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth * 0.8 / GRID_WIDTH));
   const [gameLog, setGameLog] = useState<string[]>([]);
   const [turn, setTurn] = useState<number>(0);
   const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
-
+  const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth * 0.8 / GRID_WIDTH));
 
   useEffect(() => {
     const handleResize = () => {
@@ -85,15 +93,13 @@ function HomeScreen() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Simplified entity state
   const [entities, setEntities] = useState<Entity[]>([
     { id: 1, type: 'pug', persona: new Pug(), position: { x: 1, y: 1 } },
-    { id: 2, type: 'roach', persona: new Roach(), position: { x: 3, y: 3 } },
-    { id: 3, type: 'roach', persona: new Roach(), position: { x: 4, y: 4 } },
-    { id: 4, type: 'roachMother', persona: new RoachMother(), position: { x: 3, y: 1 } },
-  ]);   
+  ]);
 
   const [entityGrid, setEntityGrid] = useState<(string | number)[][]>(() => {
-    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));  
+    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
     return newGrid;
   });
 
@@ -113,82 +119,94 @@ function HomeScreen() {
     setEntityGrid(newGrid);
   }, [entities]);
 
+  // Game Loop
   useEffect(() => {
     if (isLoading) return;
 
-    // Game Loop
     const runGameTurn = () => {
-      setGameLog(prev => [`${getCurrentTime()} Awaiting player move (use arrows or WASD)`, `${getCurrentTime()} Start turn ${turn + 1}`, ...prev].slice(0, 100));
+      setGameLog(prev => [`${getCurrentTime()} Turn ${turn + 1}. Awaiting player move (arrows/WASD).`, ...prev].slice(0, 100));
       // Player's turn
       setAwaitingPlayerInput(true);
-      // The rest of the turn logic will be triggered by player input in the other useEffect
     };
 
     runGameTurn();
-    // The main game loop is now event-driven by player input, so no timeout is needed here.
   }, [isLoading, turn]);
+
+  const toLuaTable = (obj: any): string => {
+    if (Array.isArray(obj)) {
+      return `{${obj.map(toLuaTable).join(',')}}`;
+    } else if (typeof obj === 'object' && obj !== null) {
+      return `{${Object.entries(obj).map(([k, v]) => `${k}=${toLuaTable(v)}`).join(',')}}`;
+    }
+    return JSON.stringify(obj);
+  };
 
   const executeTurn = async (playerDirection: 'up' | 'down' | 'left' | 'right') => {
     setGameLog(prev => [`${getCurrentTime()} Player move: ${playerDirection}`, ...prev].slice(0, 100));
-  
+
     // 1. Calculate player's new position
-    const player = entities.find(e => e.type === 'pug');
+    const player = entities.find(e => e.persona.isPlayer);
     if (!player) return;
     let newPlayerPos = { ...player.position };
     if (playerDirection === 'up') newPlayerPos.y--;
     else if (playerDirection === 'down') newPlayerPos.y++;
     else if (playerDirection === 'left') newPlayerPos.x--;
     else if (playerDirection === 'right') newPlayerPos.x++;
-  
-    // 2. Prepare grid for LLM
-    const gridForLlm = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill('*'));
-    entities.forEach(e => {
-      gridForLlm[e.position.y][e.position.x] = e.type;
-    });
-    const userPrompt = "Here is the current grid:\n" + gridForLlm.map(row => row.join(' ')).join('\n');
-  
-    setGameLog(prev => [`${getCurrentTime()} Awaiting enemy moves...`, ...prev].slice(0, 100));
-    const llmResponse = await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt);
-    setGameLog(prev => [`${getCurrentTime()} Enemies have moved.`, ...prev].slice(0, 100));
-  
-    // 3. Parse LLM response and create new entity list
-    const newGridFromLlm = llmResponse.split('\n').map(row => row.split(' '));
-    setGameLog(prev => [
-      `${getCurrentTime()} LLM response grid:`,
-      ...newGridFromLlm.map(row => row.join(' ')),
-      ...prev
-    ].slice(0, 100));
-    const newEntities: Entity[] = [];
-    const unplacedEnemies = entities.filter(e => !e.persona.isPlayer);
-  
-    for (let y = 0; y < GRID_HEIGHT; y++) {
-      for (let x = 0; x < GRID_WIDTH; x++) {
-        const cell = newGridFromLlm[y]?.[x];
-        if (cell && cell !== '*') {
-          const enemyIndex = unplacedEnemies.findIndex(e => e.type === cell);
-          if (enemyIndex !== -1) {
-            const enemy = unplacedEnemies.splice(enemyIndex, 1)[0];
-            newEntities.push({ ...enemy, position: { x, y } });
+
+    // Clamp player position
+    newPlayerPos.x = Math.max(0, Math.min(GRID_WIDTH - 1, newPlayerPos.x));
+    newPlayerPos.y = Math.max(0, Math.min(GRID_HEIGHT - 1, newPlayerPos.y));
+
+    const newEntities = entities.map(e => ({ ...e })); // Create a mutable copy
+    const playerEntity = newEntities.find(e => e.persona.isPlayer);
+    if (playerEntity) playerEntity.position = newPlayerPos;
+
+    // 2. Process enemy moves
+    setGameLog(prev => [`${getCurrentTime()} Processing enemy moves...`, ...prev].slice(0, 100));
+    const enemies = newEntities.filter(e => !e.persona.isPlayer);
+    for (const enemy of enemies) {
+      if (enemy.luaScript) {
+        const L = lauxlib.lauxlib.luaL_newstate();
+        lualib.lualib.luaL_openlibs(L);
+
+        const playerTable = toLuaTable(playerEntity?.position);
+        const selfTable = toLuaTable(enemy.position);
+        const otherEnemies = enemies.filter(e => e.id !== enemy.id).map(e => e.position);
+        const enemiesTable = toLuaTable(otherEnemies);
+
+        const luaCode = `
+          player = ${playerTable}
+          self = ${selfTable}
+          enemies = ${enemiesTable}
+          ${enemy.luaScript}
+          return move(player, self, enemies)
+        `;
+
+        try {
+          lauxlib.lauxlib.luaL_dostring(L, to_luastring(luaCode));
+
+          if (lua.lua.lua_istable(L, -1)) {
+            lua.lua.lua_getfield(L, -1, to_luastring('x'));
+            const newX = lua.lua.lua_tointeger(L, -1);
+            lua.lua.lua_pop(L, 1);
+
+            lua.lua.lua_getfield(L, -1, to_luastring('y'));
+            const newY = lua.lua.lua_tointeger(L, -1);
+            lua.lua.lua_pop(L, 1);
+
+            enemy.position = { x: newX, y: newY };
+            setGameLog(prev => [`${getCurrentTime()} Enemy ${enemy.type}#${enemy.id} moved to (${newX}, ${newY})`, ...prev].slice(0, 100));
           }
+        } catch (e) {
+          console.error("Lua execution error:", e);
+          setGameLog(prev => [`${getCurrentTime()} Error executing script for enemy ${enemy.type}#${enemy.id}`, ...prev].slice(0, 100));
         }
+
+        lua.lua.lua_close(L);
       }
     }
-  
-    // Add player to the new entity list
-    newEntities.push({ ...player, position: newPlayerPos });
-  
-    // Add any enemies that the LLM failed to place back in their original positions
-    unplacedEnemies.forEach(enemy => newEntities.push(enemy));
-  
-    // 4. Apply all moves simultaneously
-    setEntities(prevEntities => {
-      return newEntities.map(newEntity => {
-        const oldEntity = prevEntities.find(e => e.id === newEntity.id);
-        return oldEntity ? { ...oldEntity, position: newEntity.position } : newEntity;
-      }).sort((a, b) => a.id - b.id);
-    });
-  
-    // 5. End turn
+
+    setEntities(newEntities);
     setTurn(t => t + 1);
   };
 
@@ -221,23 +239,6 @@ function HomeScreen() {
     return <LoadScreen onComplete={() => setIsLoading(false)} />;
   }
 
-  function _onKeyDown(e:React.KeyboardEvent<HTMLInputElement>) {
-    if(e.key === 'Enter' && prompt !== '') {
-      submitPrompt(
-        SYSTEM_MESSAGE,
-        prompt,
-        () => setResponseText(GENERATING),
-        (response, isFinal) => { if (isFinal) _onRespond(response); else setResponseText(response); },
-        false
-      );
-      setPrompt('');
-    }
-  }
-
-  function _onRespond(text:string) {
-    setResponseText(text + '\n');
-  }
-
   function zoomIn() {
     setTileSize(prevSize => prevSize + 8);
   }
@@ -246,15 +247,45 @@ function HomeScreen() {
     setTileSize(prevSize => Math.max(16, prevSize - 8)); // Don't allow zooming out smaller than 16px
   }
 
-  const response = responseText === GENERATING ? <p>hmmm<WaitingEllipsis/></p> : <p>{responseText}</p>
-  
+  const handleAddEnemy = async (prompt: string) => {
+    if (!prompt) return;
+    setGameLog(prev => [`${getCurrentTime()} Generating new enemy...`, ...prev].slice(0, 100));
+
+    const luaScript = await submitPrompt(
+      LUA_GEN_SYSTEM_PROMPT,
+      prompt,
+      () => { },
+      (response, isFinal) => { },
+      true
+    );
+
+    const newEnemy: Entity = {
+      id: Date.now(),
+      type: prompt.charAt(0).toUpperCase(),
+      position: { x: 8, y: 8 },
+      luaScript: luaScript,
+      persona: { isPlayer: false }
+    };
+
+    setEntities(prev => [...prev, newEnemy]);
+    setGameLog(prev => [`${getCurrentTime()} Added new enemy '${newEnemy.type}' with script:`, luaScript, ...prev].slice(0, 100));
+  };
+
   return (
     <div className={styles.container}>
       <TopBar />
       <div className={styles.content}>
         <div className={styles.mainArea}>
           <Grid layer0={layer0} entityGrid={entityGrid} width={GRID_WIDTH} height={GRID_HEIGHT} tileSize={tileSize} />
-          <div className={styles.notificationArea} style={{ overflowY: 'auto' }}>
+          <div className={styles.notificationArea} style={{
+            overflowY: 'auto',
+            height: '300px',
+            border: '1px solid #ccc',
+            marginTop: '1rem',
+            padding: '0.5rem',
+            fontFamily: 'monospace',
+            fontSize: '0.8rem'
+          }}>
             {gameLog.map((msg, index) => (
               <p
                 key={index}
@@ -268,21 +299,18 @@ function HomeScreen() {
           </div>
         </div>
         <div className={styles.controlsContainer}>
-          <div className={styles.prompt}>
-            <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)} />
-            <ContentButton text="Send" onClick={() => {
-              submitPrompt(
-                'You are sidekick for Beethro the pug. You like to tell jokes',
-                prompt,
-                () => setResponseText(GENERATING),
-                (response, isFinal) => { if (isFinal) _onRespond(response); else setResponseText(response); },
-                false
-              );
-              setPrompt('');
-            }} />
+          <div>
+            <input
+              type="text"
+              className={styles.promptBox}
+              placeholder="Describe a monster and its behavior..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleAddEnemy(e.currentTarget.value);
+              }}
+            />
+            <ContentButton text="Add Enemy" onClick={() => handleAddEnemy((document.querySelector(`.${styles.promptBox}`) as HTMLInputElement).value)} />
             <ContentButton text="Zoom In" onClick={zoomIn} />
-            <ContentButton text="Zoom Out" onClick={zoomOut} /></p>
-            {response}
+            <ContentButton text="Zoom Out" onClick={zoomOut} />
           </div>
         </div>
       </div>
