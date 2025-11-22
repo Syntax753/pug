@@ -11,8 +11,8 @@ import Roach from '@/persona/impl/Roach';
 import RoachMother from '@/persona/impl/RoachMother';
 import { MoveContext } from "@/persona/Persona";
 
-const GRID_WIDTH = 10;
-const GRID_HEIGHT = 10;
+const GRID_WIDTH = 20;
+const GRID_HEIGHT = 20;
 
 
 // Simple noise function to create clusters
@@ -52,9 +52,11 @@ function generateLayer1(width: number, height: number, seed: number): number[][]
 
   // Add walls in top right cluster (so pug can hide from enemies)
   const topRightWalls = [
-    { x: 7, y: 0 }, { x: 8, y: 0 }, { x: 9, y: 0 },
-    { x: 7, y: 1 }, { x: 9, y: 1 },
-    { x: 7, y: 2 }
+    { x: 14, y: 0 }, { x: 15, y: 0 }, { x: 16, y: 0 }, { x: 17, y: 0 }, { x: 18, y: 0 }, { x: 19, y: 0 },
+    { x: 14, y: 1 }, { x: 19, y: 1 },
+    { x: 14, y: 2 }, { x: 19, y: 2 },
+    { x: 14, y: 3 }, { x: 19, y: 3 },
+    { x: 14, y: 4 }
   ];
 
   for (const wall of topRightWalls) {
@@ -69,11 +71,11 @@ function generateLayer1(width: number, height: number, seed: number): number[][]
     const y = Math.floor(random() * height);
 
     // Avoid initial entity positions
-    if ((x === 1 && y === 1) || (x === 2 && y === 8) || (x === 7 && y === 8) || (x === 8 && y === 2)) {
+    if ((x === 2 && y === 2) || (x === 4 && y === 16) || (x === 14 && y === 16) || (x === 16 && y === 4)) {
       continue;
     }
     // Avoid top right cluster
-    if (x >= 7 && y <= 2) {
+    if (x >= 14 && y <= 4) {
       continue;
     }
 
@@ -97,17 +99,17 @@ function HomeScreen() {
   const [gameLog, setGameLog] = useState<string[]>([]);
   const [turn, setTurn] = useState<number>(0);
   const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
-  const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth * 0.8 / GRID_WIDTH));
+  const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth * 0.8 / GRID_WIDTH * 0.5));
 
   // History state for Undo
   const [history, setHistory] = useState<Entity[][]>([]);
 
   // Factory function for initial entities to ensure fresh instances on reset
   const getInitialEntities = (): Entity[] => [
-    { id: 1, type: 'pug', persona: new Pug(), position: { x: 1, y: 1 } },
-    { id: 2, type: 'roach', persona: new Roach(), position: { x: 2, y: 8 } },
-    { id: 3, type: 'roach', persona: new Roach(), position: { x: 7, y: 8 } },
-    { id: 4, type: 'roachMother', persona: new RoachMother(), position: { x: 8, y: 2 } },
+    { id: 1, type: 'pug', persona: new Pug(), position: { x: 2, y: 2 } },
+    { id: 2, type: 'roach', persona: new Roach(), position: { x: 4, y: 16 } },
+    { id: 3, type: 'roach', persona: new Roach(), position: { x: 14, y: 16 } },
+    { id: 4, type: 'roachMother', persona: new RoachMother(), position: { x: 16, y: 4 } },
   ];
 
   // Simplified entity state
@@ -120,7 +122,7 @@ function HomeScreen() {
 
   useEffect(() => {
     const handleResize = () => {
-      setTileSize(Math.floor(window.innerWidth * 0.8 / GRID_WIDTH));
+      setTileSize(Math.floor(window.innerWidth * 0.8 / GRID_WIDTH * 0.5));
     };
     window.addEventListener('resize', handleResize);
     handleResize(); // Initial calculation
