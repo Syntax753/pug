@@ -55,6 +55,25 @@ function HomeScreen() {
   const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
   const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth * 0.8 / GRID_WIDTH));
 
+  // History state for Undo
+  const [history, setHistory] = useState<Entity[][]>([]);
+
+  // Factory function for initial entities to ensure fresh instances on reset
+  const getInitialEntities = (): Entity[] => [
+    { id: 1, type: 'pug', persona: new Pug(), position: { x: 1, y: 1 } },
+    { id: 2, type: 'roach', persona: new Roach(), position: { x: 2, y: 8 } },
+    { id: 3, type: 'roach', persona: new Roach(), position: { x: 7, y: 8 } },
+    { id: 4, type: 'roachMother', persona: new RoachMother(), position: { x: 8, y: 2 } },
+  ];
+
+  // Simplified entity state
+  const [entities, setEntities] = useState<Entity[]>(getInitialEntities());
+
+  const [entityGrid, setEntityGrid] = useState<(string | number)[][]>(() => {
+    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
+    return newGrid;
+  });
+
   useEffect(() => {
     const handleResize = () => {
       setTileSize(Math.floor(window.innerWidth * 0.8 / GRID_WIDTH));
@@ -63,19 +82,6 @@ function HomeScreen() {
     handleResize(); // Initial calculation
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  // Simplified entity state
-  const [entities, setEntities] = useState<Entity[]>([
-    { id: 1, type: 'pug', persona: new Pug(), position: { x: 1, y: 1 } },
-    { id: 2, type: 'roach', persona: new Roach(), position: { x: 2, y: 8 } },
-    { id: 3, type: 'roach', persona: new Roach(), position: { x: 7, y: 8 } },
-    { id: 4, type: 'roachMother', persona: new RoachMother(), position: { x: 8, y: 2 } },
-  ]);
-
-  const [entityGrid, setEntityGrid] = useState<(string | number)[][]>(() => {
-    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
-    return newGrid;
-  });
 
   // Generate a random seed once per component instance to vary the grass pattern
   const seed = useMemo(() => Math.random() * 1000, []);
@@ -107,6 +113,9 @@ function HomeScreen() {
   }, [isLoading, turn]);
 
   const executeTurn = async (playerDirection: 'up' | 'down' | 'left' | 'right') => {
+    // Save current state to history before moving
+    setHistory(prev => [...prev, entities]);
+
     setGameLog(prev => [`${getCurrentTime()} Player move: ${playerDirection}`, ...prev].slice(0, 100));
 
     // Initialize future grid (empty for entities)
@@ -115,22 +124,35 @@ function HomeScreen() {
     // Create a copy of entities to update positions
     const nextEntities = entities.map(e => ({ ...e }));
 
-    // Process moves for ALL entities (including player)
+    // 1. Find Player and calculate their move FIRST
+    const playerIndex = nextEntities.findIndex(e => e.persona.isPlayer);
+    if (playerIndex !== -1) {
+      const playerEntity = nextEntities[playerIndex];
+      const playerContext: MoveContext = {
+        entities: entities,
+        myPosition: playerEntity.position,
+        playerInput: playerDirection
+      };
+      const newPlayerPos = playerEntity.persona.move(playerContext, futureGrid);
+      playerEntity.position = newPlayerPos;
+    }
+
+    // 2. Create a context with the Player's NEW position for the enemies
+    // We use 'nextEntities' which now has the updated player position
+    const contextEntities = nextEntities.map(e => ({ ...e }));
+
+    // 3. Process moves for ENEMIES
     for (const entity of nextEntities) {
+      if (entity.persona.isPlayer) continue; // Already moved
+
       const context: MoveContext = {
-        entities: entities, // Pass current state as context
+        entities: contextEntities, // Use the state where player has already moved
         myPosition: entity.position,
-        playerInput: entity.persona.isPlayer ? playerDirection : undefined
+        playerInput: undefined
       };
 
       const newPos = entity.persona.move(context, futureGrid);
-
-      // Update entity position
       entity.position = newPos;
-
-      if (!entity.persona.isPlayer) {
-        // setGameLog(prev => [`${getCurrentTime()} Enemy ${entity.type}#${entity.id} moved to (${newPos.x}, ${newPos.y})`, ...prev].slice(0, 100));
-      }
     }
 
     setEntities(nextEntities);
@@ -139,8 +161,36 @@ function HomeScreen() {
     setTurn(t => t + 1);
   };
 
+  const handleReset = () => {
+    setEntities(getInitialEntities());
+    setHistory([]);
+    setTurn(0);
+    setGameLog([]);
+    setAwaitingPlayerInput(false); // Will be set to true by the game loop effect
+  };
+
+  const handleUndo = () => {
+    if (history.length === 0) return;
+
+    const previousState = history[history.length - 1];
+    setEntities(previousState);
+    setHistory(prev => prev.slice(0, -1));
+    setTurn(t => Math.max(0, t - 1));
+    setGameLog(prev => [`${getCurrentTime()} Undo last move.`, ...prev].slice(0, 100));
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Global keys
+      if (e.key.toLowerCase() === 'r') {
+        handleReset();
+        return;
+      }
+      if (e.key.toLowerCase() === 'z') {
+        handleUndo();
+        return;
+      }
+
       if (awaitingPlayerInput) {
         const player = entities.find(e => e.persona.isPlayer);
         if (!player) return;
@@ -162,7 +212,7 @@ function HomeScreen() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [awaitingPlayerInput, entities]);
+  }, [awaitingPlayerInput, entities, history]);
 
   if (isLoading) {
     return <LoadScreen onComplete={() => setIsLoading(false)} />;
