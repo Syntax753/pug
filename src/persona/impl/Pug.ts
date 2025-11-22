@@ -27,6 +27,13 @@ class Pug implements Persona {
         newX = Math.max(0, Math.min(futureGrid[0].length - 1, newX));
         newY = Math.max(0, Math.min(futureGrid.length - 1, newY));
 
+        // Check for obstacles in layer1
+        if (context.layer1[newY][newX] === 92) {
+            // Blocked, stay at current position
+            newX = myPosition.x;
+            newY = myPosition.y;
+        }
+
         // Update future grid
         futureGrid[newY][newX] = 'pug';
         return { x: newX, y: newY };

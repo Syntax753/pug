@@ -10,7 +10,8 @@ export interface Avatar {
 export interface MoveContext {
     entities: Entity[];
     myPosition: Position;
-    playerInput?: 'up' | 'down' | 'left' | 'right';
+    playerInput?: string;
+    layer1: number[][];
 }
 
 export default interface Persona {

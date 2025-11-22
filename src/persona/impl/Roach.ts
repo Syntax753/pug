@@ -10,8 +10,8 @@ class Roach implements Persona {
         South: roachImage,
         West: roachImage,
     };
-    public goal: string = "You want to reach the pug.";
-    public prompt: string = "You prefer vertical movement over horizontal movement.";
+    public goal: string = "Seek the pug";
+    public prompt: string = "";
 
     public move(context: MoveContext, futureGrid: (string | number)[][]): Position {
         const { entities, myPosition } = context;
@@ -35,6 +35,13 @@ class Roach implements Persona {
         // Simple bounds check
         newX = Math.max(0, Math.min(futureGrid[0].length - 1, newX));
         newY = Math.max(0, Math.min(futureGrid.length - 1, newY));
+
+        // Check for obstacles in layer1
+        if (context.layer1[newY][newX] === 92) {
+            // Blocked, stay at current position
+            newX = myPosition.x;
+            newY = myPosition.y;
+        }
 
         futureGrid[newY][newX] = 'roach';
         return { x: newX, y: newY };

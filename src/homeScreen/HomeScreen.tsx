@@ -41,6 +41,33 @@ function loadGrid(width: number, height: number, seed: number): number[][] {
   return newGrid;
 }
 
+function generateLayer1(width: number, height: number, seed: number): number[][] {
+  const newGrid = Array(height).fill(0).map(() => Array(width).fill(0));
+  // Simple pseudo-random generator based on seed
+  let currentSeed = seed;
+  const random = () => {
+    const x = Math.sin(currentSeed++) * 10000;
+    return x - Math.floor(x);
+  };
+
+  let obstaclesPlaced = 0;
+  while (obstaclesPlaced < 5) {
+    const x = Math.floor(random() * width);
+    const y = Math.floor(random() * height);
+
+    // Avoid initial entity positions (approximate check)
+    if ((x === 1 && y === 1) || (x === 2 && y === 8) || (x === 7 && y === 8) || (x === 8 && y === 2)) {
+      continue;
+    }
+
+    if (newGrid[y][x] === 0) {
+      newGrid[y][x] = 92;
+      obstaclesPlaced++;
+    }
+  }
+  return newGrid;
+}
+
 function getCurrentTime(): string {
   const now = new Date();
   const hours = now.getHours().toString().padStart(2, '0');
@@ -90,6 +117,10 @@ function HomeScreen() {
     return loadGrid(GRID_WIDTH, GRID_HEIGHT, seed);
   }, [seed]);
 
+  const layer1 = useMemo<number[][]>(() => {
+    return generateLayer1(GRID_WIDTH, GRID_HEIGHT, seed);
+  }, [seed]);
+
   // This effect synchronizes the entityGrid with the entities' positions
   useEffect(() => {
     const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
@@ -131,7 +162,8 @@ function HomeScreen() {
       const playerContext: MoveContext = {
         entities: entities,
         myPosition: playerEntity.position,
-        playerInput: playerDirection
+        playerInput: playerDirection,
+        layer1: layer1
       };
       const newPlayerPos = playerEntity.persona.move(playerContext, futureGrid);
       playerEntity.position = newPlayerPos;
@@ -148,7 +180,8 @@ function HomeScreen() {
       const context: MoveContext = {
         entities: contextEntities, // Use the state where player has already moved
         myPosition: entity.position,
-        playerInput: undefined
+        playerInput: undefined,
+        layer1: layer1
       };
 
       const newPos = entity.persona.move(context, futureGrid);
@@ -254,7 +287,7 @@ function HomeScreen() {
       <TopBar />
       <div className={styles.content}>
         <div className={styles.mainArea}>
-          <Grid layer0={layer0} entityGrid={entityGrid} width={GRID_WIDTH} tileSize={tileSize} />
+          <Grid layer0={layer0} layer1={layer1} entityGrid={entityGrid} width={GRID_WIDTH} tileSize={tileSize} />
           <div className={styles.notificationArea} style={{
             overflowY: 'auto',
             height: '300px',
