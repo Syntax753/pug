@@ -14,12 +14,20 @@ import { MoveContext } from "@/persona/Persona";
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 20;
 
+// Helper to create persona instances
+function createPersona(type: string) {
+  switch (type) {
+    case 'pug': return new Pug();
+    case 'roach': return new Roach();
+    case 'roachMother': return new RoachMother();
+    default: return new Roach();
+  }
+}
 
 // Simple noise function to create clusters
 function simpleNoise(x: number, y: number, seed: number = 0): number {
   const n = x + y * 57 + seed;
   const x1 = (n << 13) ^ n;
-  // Return a value between 0 and 1
   return (1.0 - ((x1 * (x1 * x1 * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0);
 }
 
@@ -44,7 +52,6 @@ function loadGrid(width: number, height: number, seed: number): number[][] {
 function generateLayer1(width: number, height: number, seed: number): number[][] {
   const newGrid = Array(height).fill(0).map(() => Array(width).fill(0));
 
-  // Helper to place a wall
   const placeWall = (x: number, y: number) => {
     if (x >= 0 && x < width && y >= 0 && y < height) {
       newGrid[y][x] = 92;
@@ -62,39 +69,99 @@ function generateLayer1(width: number, height: number, seed: number): number[][]
   }
 
   // 2. Intricate Maze Walls
-  // Vertical Spines
   for (let y = 2; y < 18; y++) {
-    if (y !== 4 && y !== 15) placeWall(5, y);  // Wall at x=5 with gaps
-    if (y !== 2 && y !== 17 && (y < 8 || y > 11)) placeWall(10, y); // Wall at x=10 (avoiding center room)
-    if (y !== 4 && y !== 15) placeWall(15, y); // Wall at x=15 with gaps
+    if (y !== 4 && y !== 15) placeWall(5, y);
+    if (y !== 2 && y !== 17 && (y < 8 || y > 11)) placeWall(10, y);
+    if (y !== 4 && y !== 15) placeWall(15, y);
   }
 
-  // Horizontal Spines
   for (let x = 2; x < 18; x++) {
-    if (x !== 2 && x !== 17 && (x < 8 || x > 11)) placeWall(x, 5);  // Wall at y=5 (avoiding center)
-    if (x !== 5 && x !== 15) placeWall(x, 10); // Wall at y=10 (crossing center)
-    if (x !== 2 && x !== 17 && (x < 8 || x > 11)) placeWall(x, 15); // Wall at y=15 (avoiding center)
+    if (x !== 2 && x !== 17 && (x < 8 || x > 11)) placeWall(x, 5);
+    if (x !== 5 && x !== 15) placeWall(x, 10);
+    if (x !== 2 && x !== 17 && (x < 8 || x > 11)) placeWall(x, 15);
   }
 
-  // Extra maze details to break up long corridors
   placeWall(2, 8); placeWall(3, 8);
   placeWall(17, 12); placeWall(16, 12);
   placeWall(7, 2); placeWall(7, 3);
   placeWall(12, 17); placeWall(12, 16);
 
-  // Clear Center Room (8,8) to (11,11)
+  // Clear Center Room
   for (let y = 8; y <= 11; y++) {
     for (let x = 8; x <= 11; x++) {
       newGrid[y][x] = 0;
     }
   }
-  // Add center room entrances
-  newGrid[8][9] = 0; newGrid[8][10] = 0; // Top
-  newGrid[11][9] = 0; newGrid[11][10] = 0; // Bottom
-  newGrid[9][8] = 0; newGrid[10][8] = 0; // Left
-  newGrid[9][11] = 0; newGrid[10][11] = 0; // Right
+  newGrid[8][9] = 0; newGrid[8][10] = 0;
+  newGrid[11][9] = 0; newGrid[11][10] = 0;
+  newGrid[9][8] = 0; newGrid[10][8] = 0;
+  newGrid[9][11] = 0; newGrid[10][11] = 0;
 
   return newGrid;
+}
+
+type LevelData = {
+  layer0: number[][];
+  layer1: number[][];
+  initialConfigs: { type: string, position: { x: number, y: number }, movementOrder: number }[];
+};
+
+function generateLevel(width: number, height: number): LevelData {
+  const seed = Math.random() * 1000;
+  const layer0 = loadGrid(width, height, seed);
+  const layer1 = generateLayer1(width, height, seed);
+
+  // Find all valid empty spots
+  const emptySpots: { x: number, y: number }[] = [];
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      if (layer1[y][x] === 0) {
+        emptySpots.push({ x, y });
+      }
+    }
+  }
+
+  // Shuffle empty spots
+  for (let i = emptySpots.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [emptySpots[i], emptySpots[j]] = [emptySpots[j], emptySpots[i]];
+  }
+
+  const initialConfigs: { type: string, position: { x: number, y: number }, movementOrder: number }[] = [];
+  let movementOrder = 0;
+
+  // 1. Place Pug (Try (2,2) first, else random)
+  const pugSpotIndex = emptySpots.findIndex(p => p.x === 2 && p.y === 2);
+  let pugPos = { x: 2, y: 2 };
+  if (pugSpotIndex !== -1) {
+    pugPos = emptySpots.splice(pugSpotIndex, 1)[0];
+  } else {
+    pugPos = emptySpots.pop()!;
+  }
+  initialConfigs.push({ type: 'pug', position: pugPos, movementOrder: movementOrder++ });
+
+  // Filter for safe enemy spots (>= 7 tiles away horizontally AND vertically)
+  const validEnemySpots = emptySpots.filter(s =>
+    Math.abs(s.x - pugPos.x) >= 7 && Math.abs(s.y - pugPos.y) >= 7
+  );
+
+  // 2. Place RoachMothers (1 or 2)
+  const motherCount = Math.random() > 0.5 ? 2 : 1;
+  for (let i = 0; i < motherCount; i++) {
+    if (validEnemySpots.length > 0) {
+      initialConfigs.push({ type: 'roachMother', position: validEnemySpots.pop()!, movementOrder: movementOrder++ });
+    }
+  }
+
+  // 3. Place Roaches (5 to 8)
+  const roachCount = Math.floor(Math.random() * 4) + 5; // 5, 6, 7, or 8
+  for (let i = 0; i < roachCount; i++) {
+    if (validEnemySpots.length > 0) {
+      initialConfigs.push({ type: 'roach', position: validEnemySpots.pop()!, movementOrder: movementOrder++ });
+    }
+  }
+
+  return { layer0, layer1, initialConfigs };
 }
 
 function getCurrentTime(): string {
@@ -111,28 +178,27 @@ function HomeScreen() {
   const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
   const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth * 0.8 / GRID_WIDTH * 0.5));
 
-  // History state for Undo
+  // Level Data State
+  const [levelData] = useState<LevelData>(() => generateLevel(GRID_WIDTH, GRID_HEIGHT));
+
+  // Entity State
+  const [entities, setEntities] = useState<Entity[]>([]);
   const [history, setHistory] = useState<Entity[][]>([]);
 
-  // Factory function for initial entities to ensure fresh instances on reset
-  const getInitialEntities = (): Entity[] => [
-    { id: 1, type: 'pug', persona: new Pug(), position: { x: 2, y: 2 }, movementOrder: 0 },
-    // Roaches scattered in the maze
-    { id: 2, type: 'roach', persona: new Roach(), position: { x: 8, y: 9 }, movementOrder: 1 }, // Center
-    { id: 3, type: 'roach', persona: new Roach(), position: { x: 17, y: 2 }, movementOrder: 2 }, // Top Right
-    { id: 4, type: 'roach', persona: new Roach(), position: { x: 2, y: 17 }, movementOrder: 3 }, // Bottom Left
-    { id: 5, type: 'roach', persona: new Roach(), position: { x: 12, y: 7 }, movementOrder: 4 }, // Mid Right
-    { id: 6, type: 'roach', persona: new Roach(), position: { x: 7, y: 13 }, movementOrder: 5 }, // Mid Left
-    // Mother in the bottom right room
-    { id: 7, type: 'roachMother', persona: new RoachMother(), position: { x: 17, y: 17 }, movementOrder: 6 },
-  ];
-
-  // Simplified entity state
-  const [entities, setEntities] = useState<Entity[]>(getInitialEntities());
+  // Initialize entities from level data
+  useEffect(() => {
+    const newEntities = levelData.initialConfigs.map((c, index) => ({
+      id: Date.now() + index,
+      type: c.type as any,
+      position: { ...c.position },
+      movementOrder: c.movementOrder,
+      persona: createPersona(c.type)
+    }));
+    setEntities(newEntities);
+  }, [levelData]);
 
   const [entityGrid, setEntityGrid] = useState<(string | number)[][]>(() => {
-    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
-    return newGrid;
+    return Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
   });
 
   useEffect(() => {
@@ -140,22 +206,11 @@ function HomeScreen() {
       setTileSize(Math.floor(window.innerWidth * 0.8 / GRID_WIDTH * 0.5));
     };
     window.addEventListener('resize', handleResize);
-    handleResize(); // Initial calculation
+    handleResize();
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Generate a random seed once per component instance to vary the grass pattern
-  const seed = useMemo(() => Math.random() * 1000, []);
-
-  const layer0 = useMemo<number[][]>(() => {
-    return loadGrid(GRID_WIDTH, GRID_HEIGHT, seed);
-  }, [seed]);
-
-  const layer1 = useMemo<number[][]>(() => {
-    return generateLayer1(GRID_WIDTH, GRID_HEIGHT, seed);
-  }, [seed]);
-
-  // This effect synchronizes the entityGrid with the entities' positions
+  // Synchronize entityGrid
   useEffect(() => {
     const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
     for (const entity of entities) {
@@ -170,7 +225,6 @@ function HomeScreen() {
 
     const runGameTurn = () => {
       setGameLog(prev => [`${getCurrentTime()} Turn ${turn + 1}. Awaiting player move (arrows/WASD/numpad).`, ...prev].slice(0, 100));
-      // Player's turn
       setAwaitingPlayerInput(true);
     };
 
@@ -178,18 +232,13 @@ function HomeScreen() {
   }, [isLoading, turn]);
 
   const executeTurn = async (playerMove: { x: number, y: number }) => {
-    // Save current state to history before moving
     setHistory(prev => [...prev, entities]);
 
-    // Initialize future grid (empty for entities)
     const futureGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
-
-    // Create a copy of entities to update positions
     const nextEntities = entities.map(e => ({ ...e }));
-
     const newLogs: string[] = [];
 
-    // 1. Find Player and calculate their move FIRST
+    // 1. Move Player
     const playerIndex = nextEntities.findIndex(e => e.persona.isPlayer);
     if (playerIndex !== -1) {
       const playerEntity = nextEntities[playerIndex];
@@ -197,44 +246,34 @@ function HomeScreen() {
         entities: entities,
         myPosition: playerEntity.position,
         playerInput: playerMove,
-        layer1: layer1
+        layer1: levelData.layer1
       };
       const newPlayerPos = playerEntity.persona.move(playerContext, futureGrid);
       playerEntity.position = newPlayerPos;
-
-      // Log Player Move
       newLogs.push(`${getCurrentTime()} Pug move: (${newPlayerPos.x}, ${newPlayerPos.y})`);
     }
 
-    // 2. Create a context with the Player's NEW position for the enemies
-    // We use 'nextEntities' which now has the updated player position
+    // 2. Move Enemies
     const contextEntities = nextEntities.map(e => ({ ...e }));
-
-    // 3. Process moves for ENEMIES in movement order
-    // Sort enemies by movementOrder to ensure deterministic execution
     const enemies = nextEntities
       .filter(e => !e.persona.isPlayer)
       .sort((a, b) => a.movementOrder - b.movementOrder);
 
     for (const entity of enemies) {
       const context: MoveContext = {
-        entities: contextEntities, // Use the state where player has already moved
+        entities: contextEntities,
         myPosition: entity.position,
         playerInput: undefined,
-        layer1: layer1
+        layer1: levelData.layer1
       };
 
       const newPos = entity.persona.move(context, futureGrid);
-
-      // Check if another entity is already at the new position in the future grid
       const occupiedByEntity = futureGrid[newPos.y]?.[newPos.x];
+
       if (occupiedByEntity && typeof occupiedByEntity === 'string') {
-        // Position is occupied, stay at current position
         futureGrid[entity.position.y][entity.position.x] = entity.type;
-        // Don't update entity.position
         newLogs.push(`${getCurrentTime()} ${entity.type} ${entity.movementOrder} move: (${entity.position.x}, ${entity.position.y}) (Blocked)`);
       } else {
-        // Position is free, move there
         futureGrid[newPos.y][newPos.x] = entity.type;
         entity.position = newPos;
         newLogs.push(`${getCurrentTime()} ${entity.type} ${entity.movementOrder} move: (${newPos.x}, ${newPos.y})`);
@@ -242,25 +281,28 @@ function HomeScreen() {
     }
 
     setEntities(nextEntities);
-    // entityGrid will be updated by the useEffect
-
     setTurn(t => t + 1);
-
-    // Update logs in reverse order so newest is at top
     setGameLog(prev => [...newLogs.reverse(), ...prev].slice(0, 100));
   };
 
   const handleReset = () => {
-    setEntities(getInitialEntities());
+    // Restore initial entities from level data
+    const newEntities = levelData.initialConfigs.map((c, index) => ({
+      id: Date.now() + index,
+      type: c.type as any,
+      position: { ...c.position },
+      movementOrder: c.movementOrder,
+      persona: createPersona(c.type)
+    }));
+    setEntities(newEntities);
     setHistory([]);
     setTurn(0);
     setGameLog([]);
-    setAwaitingPlayerInput(true); // Enable player input immediately after reset
+    setAwaitingPlayerInput(true);
   };
 
   const handleUndo = () => {
     if (history.length === 0) return;
-
     const previousState = history[history.length - 1];
     setEntities(previousState);
     setHistory(prev => prev.slice(0, -1));
@@ -270,47 +312,36 @@ function HomeScreen() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Global keys
-      if (e.key.toLowerCase() === 'r') {
-        handleReset();
-        return;
-      }
-      if (e.key.toLowerCase() === 'z') {
-        handleUndo();
-        return;
-      }
+      if (e.key.toLowerCase() === 'r') { handleReset(); return; }
+      if (e.key.toLowerCase() === 'z') { handleUndo(); return; }
 
       if (awaitingPlayerInput) {
         const player = entities.find(e => e.persona.isPlayer);
         if (!player) return;
 
         let moveVector: { x: number, y: number } | null = null;
-
-        // Arrow keys and WASD
         if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') moveVector = { x: 0, y: -1 };
         else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') moveVector = { x: 0, y: 1 };
         else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') moveVector = { x: -1, y: 0 };
         else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') moveVector = { x: 1, y: 0 };
-        // Numpad
-        else if (e.key === '1') moveVector = { x: -1, y: 1 };  // Down-left
-        else if (e.key === '2') moveVector = { x: 0, y: 1 };   // Down
-        else if (e.key === '3') moveVector = { x: 1, y: 1 };   // Down-right
-        else if (e.key === '4') moveVector = { x: -1, y: 0 };  // Left
-        else if (e.key === '5' || e.key === ' ') moveVector = { x: 0, y: 0 }; // Skip turn
-        else if (e.key === '6') moveVector = { x: 1, y: 0 };   // Right
-        else if (e.key === '7') moveVector = { x: -1, y: -1 }; // Up-left
-        else if (e.key === '8') moveVector = { x: 0, y: -1 };  // Up
-        else if (e.key === '9') moveVector = { x: 1, y: -1 };  // Up-right
-        else return; // Not a movement key
+        else if (e.key === '1') moveVector = { x: -1, y: 1 };
+        else if (e.key === '2') moveVector = { x: 0, y: 1 };
+        else if (e.key === '3') moveVector = { x: 1, y: 1 };
+        else if (e.key === '4') moveVector = { x: -1, y: 0 };
+        else if (e.key === '5' || e.key === ' ') moveVector = { x: 0, y: 0 };
+        else if (e.key === '6') moveVector = { x: 1, y: 0 };
+        else if (e.key === '7') moveVector = { x: -1, y: -1 };
+        else if (e.key === '8') moveVector = { x: 0, y: -1 };
+        else if (e.key === '9') moveVector = { x: 1, y: -1 };
+        else return;
 
         if (moveVector) {
-          e.preventDefault(); // Prevent default browser action (scrolling)
+          e.preventDefault();
           setAwaitingPlayerInput(false);
           executeTurn(moveVector);
         }
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [awaitingPlayerInput, entities, history]);
@@ -319,34 +350,34 @@ function HomeScreen() {
     return <LoadScreen onComplete={() => setIsLoading(false)} />;
   }
 
-  function zoomIn() {
-    setTileSize(prevSize => prevSize + 8);
-  }
-
-  function zoomOut() {
-    setTileSize(prevSize => Math.max(16, prevSize - 8)); // Don't allow zooming out smaller than 16px
-  }
+  function zoomIn() { setTileSize(prevSize => prevSize + 8); }
+  function zoomOut() { setTileSize(prevSize => Math.max(16, prevSize - 8)); }
 
   const handleAddEnemy = async (prompt: string) => {
     if (!prompt) return;
-
-    // Determine type based on prompt content (simple heuristic)
     let type: 'roach' | 'roachMother' = 'roach';
-    let persona = new Roach();
-
     if (prompt.toLowerCase().includes('mother') || prompt.toLowerCase().includes('flee')) {
       type = 'roachMother';
-      persona = new RoachMother();
     }
-
-    // Find the highest movement order and assign the next one
     const maxMovementOrder = entities.reduce((max, e) => Math.max(max, e.movementOrder), -1);
+
+    // Find a valid empty spot for the new enemy
+    let spawnPos = { x: 8, y: 8 };
+    // Try 10 times to find an empty spot
+    for (let i = 0; i < 10; i++) {
+      const rx = Math.floor(Math.random() * GRID_WIDTH);
+      const ry = Math.floor(Math.random() * GRID_HEIGHT);
+      if (levelData.layer1[ry][rx] === 0 && !entities.some(e => e.position.x === rx && e.position.y === ry)) {
+        spawnPos = { x: rx, y: ry };
+        break;
+      }
+    }
 
     const newEnemy: Entity = {
       id: Date.now(),
       type: type,
-      position: { x: 8, y: 8 }, // Default spawn
-      persona: persona,
+      position: spawnPos,
+      persona: createPersona(type),
       movementOrder: maxMovementOrder + 1
     };
 
@@ -359,7 +390,7 @@ function HomeScreen() {
       <TopBar />
       <div className={styles.content}>
         <div className={styles.mainArea}>
-          <Grid layer0={layer0} layer1={layer1} entityGrid={entityGrid} width={GRID_WIDTH} tileSize={tileSize} />
+          <Grid layer0={levelData.layer0} layer1={levelData.layer1} entityGrid={entityGrid} width={GRID_WIDTH} tileSize={tileSize} />
           <div className={styles.notificationArea} style={{
             overflowY: 'auto',
             height: '300px',
@@ -370,14 +401,7 @@ function HomeScreen() {
             fontSize: '0.8rem'
           }}>
             {gameLog.map((msg, index) => (
-              <p
-                key={index}
-                style={{
-                  fontFamily: 'system-ui, sans-serif',
-                  fontSize: '0.8rem',
-                  padding: '0.2rem 0.5rem'
-                }}
-              >{msg}</p>
+              <p key={index} style={{ fontFamily: 'system-ui, sans-serif', fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>{msg}</p>
             ))}
           </div>
         </div>
@@ -387,9 +411,7 @@ function HomeScreen() {
               type="text"
               className={styles.promptBox}
               placeholder="Type 'roach' or 'mother'..."
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleAddEnemy(e.currentTarget.value);
-              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAddEnemy(e.currentTarget.value); }}
             />
             <ContentButton text="Add Enemy" onClick={() => handleAddEnemy((document.querySelector(`.${styles.promptBox}`) as HTMLInputElement).value)} />
             <ContentButton text="Zoom In" onClick={zoomIn} />
