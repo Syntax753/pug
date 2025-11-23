@@ -20,6 +20,7 @@
     "@mlc-ai/web-runtime": "^0.18.0-dev2",
     "@mlc-ai/web-tokenizers": "^0.1.6",
     "decent-portal": "^2.4.7",
+    "fengari": "^0.1.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

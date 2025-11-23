@@ -43,7 +43,22 @@ async function _onInstall() {
 function _onFetch(event) {
   event.respondWith(
     caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+      if (response) {
+        return response;
+      }
+      
+      return fetch(event.request).catch(error => {
+        console.log('Fetch failed; returning offline page instead.', error);
+        // You could return a custom offline page here
+        // For now, we'll just return a simple response
+        return new Response('Network request failed. App is offline.', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: new Headers({
+            'Content-Type': 'text/plain'
+          })
+        });
+      });
     })
   );
 }

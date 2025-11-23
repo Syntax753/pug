@@ -10,4 +10,5 @@ export interface Entity {
   type: 'pug' | 'roach' | 'roachMother';
   persona: Persona;
   position: Position;
+  movementOrder: number;
 }

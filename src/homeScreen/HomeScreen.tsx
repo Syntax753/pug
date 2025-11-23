@@ -1,32 +1,37 @@
 import { useEffect, useMemo, useState } from "react";
 
-import WaitingEllipsis from '@/components/waitingEllipsis/WaitingEllipsis';
 import ContentButton from '@/components/contentButton/ContentButton';
 import LoadScreen from '@/loadScreen/LoadScreen';
 import TopBar from '@/components/topBar/TopBar';
-import Grid from '@/components/grid/Grid';  
-import { GENERATING, submitPrompt, SYSTEM_MESSAGE } from '@/homeScreen/interactions/prompt';
-import { getLLMNavigatorMove } from '@/homeScreen/interactions/game';
-import { Entity, Position } from '@/persona/types';
+import Grid from '@/components/grid/Grid';
+import { Entity } from '@/persona/types';
 import styles from '@/homeScreen/HomeScreen.module.css';
 import Pug from '@/persona/impl/Pug';
 import Roach from '@/persona/impl/Roach';
 import RoachMother from '@/persona/impl/RoachMother';
+import { MoveContext } from "@/persona/Persona";
 
-const SYSTEM_PROMPT = "You are an expert system that gives directions - you must only respond with a single direction from up, down, left or right.";
-const GRID_WIDTH = 15;
-const GRID_HEIGHT = 9;
+const GRID_WIDTH = 20;
+const GRID_HEIGHT = 20;
 
+// Helper to create persona instances
+function createPersona(type: string) {
+  switch (type) {
+    case 'pug': return new Pug();
+    case 'roach': return new Roach();
+    case 'roachMother': return new RoachMother();
+    default: return new Roach();
+  }
+}
 
 // Simple noise function to create clusters
 function simpleNoise(x: number, y: number, seed: number = 0): number {
   const n = x + y * 57 + seed;
   const x1 = (n << 13) ^ n;
-  // Return a value between 0 and 1
   return (1.0 - ((x1 * (x1 * x1 * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0);
 }
 
-function loadGrid(width: number, height: number, seed: number): number[][] {  
+function loadGrid(width: number, height: number, seed: number): number[][] {
   const NOISE_SCALE = 0.2;
   const newGrid = Array(height).fill(0).map(() => Array(width).fill(0));
   for (let y = 0; y < height; y++) {
@@ -44,53 +49,168 @@ function loadGrid(width: number, height: number, seed: number): number[][] {
   return newGrid;
 }
 
+function generateLayer1(width: number, height: number, seed: number): number[][] {
+  const newGrid = Array(height).fill(0).map(() => Array(width).fill(0));
+
+  const placeWall = (x: number, y: number) => {
+    if (x >= 0 && x < width && y >= 0 && y < height) {
+      newGrid[y][x] = 92;
+    }
+  };
+
+  // 1. Border Walls
+  for (let x = 0; x < width; x++) {
+    placeWall(x, 0);
+    placeWall(x, height - 1);
+  }
+  for (let y = 0; y < height; y++) {
+    placeWall(0, y);
+    placeWall(width - 1, y);
+  }
+
+  // 2. Intricate Maze Walls
+  for (let y = 2; y < 18; y++) {
+    if (y !== 4 && y !== 15) placeWall(5, y);
+    if (y !== 2 && y !== 17 && (y < 8 || y > 11)) placeWall(10, y);
+    if (y !== 4 && y !== 15) placeWall(15, y);
+  }
+
+  for (let x = 2; x < 18; x++) {
+    if (x !== 2 && x !== 17 && (x < 8 || x > 11)) placeWall(x, 5);
+    if (x !== 5 && x !== 15) placeWall(x, 10);
+    if (x !== 2 && x !== 17 && (x < 8 || x > 11)) placeWall(x, 15);
+  }
+
+  placeWall(2, 8); placeWall(3, 8);
+  placeWall(17, 12); placeWall(16, 12);
+  placeWall(7, 2); placeWall(7, 3);
+  placeWall(12, 17); placeWall(12, 16);
+
+  // Clear Center Room
+  for (let y = 8; y <= 11; y++) {
+    for (let x = 8; x <= 11; x++) {
+      newGrid[y][x] = 0;
+    }
+  }
+  newGrid[8][9] = 0; newGrid[8][10] = 0;
+  newGrid[11][9] = 0; newGrid[11][10] = 0;
+  newGrid[9][8] = 0; newGrid[10][8] = 0;
+  newGrid[9][11] = 0; newGrid[10][11] = 0;
+
+  return newGrid;
+}
+
+type LevelData = {
+  layer0: number[][];
+  layer1: number[][];
+  initialConfigs: { type: string, position: { x: number, y: number }, movementOrder: number }[];
+};
+
+function generateLevel(width: number, height: number): LevelData {
+  const seed = Math.random() * 1000;
+  const layer0 = loadGrid(width, height, seed);
+  const layer1 = generateLayer1(width, height, seed);
+
+  // Find all valid empty spots
+  const emptySpots: { x: number, y: number }[] = [];
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      if (layer1[y][x] === 0) {
+        emptySpots.push({ x, y });
+      }
+    }
+  }
+
+  // Shuffle empty spots
+  for (let i = emptySpots.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [emptySpots[i], emptySpots[j]] = [emptySpots[j], emptySpots[i]];
+  }
+
+  const initialConfigs: { type: string, position: { x: number, y: number }, movementOrder: number }[] = [];
+  let movementOrder = 0;
+
+  // 1. Place Pug (Try (2,2) first, else random)
+  const pugSpotIndex = emptySpots.findIndex(p => p.x === 2 && p.y === 2);
+  let pugPos = { x: 2, y: 2 };
+  if (pugSpotIndex !== -1) {
+    pugPos = emptySpots.splice(pugSpotIndex, 1)[0];
+  } else {
+    pugPos = emptySpots.pop()!;
+  }
+  initialConfigs.push({ type: 'pug', position: pugPos, movementOrder: movementOrder++ });
+
+  // Filter for safe enemy spots (>= 7 tiles away horizontally AND vertically)
+  const validEnemySpots = emptySpots.filter(s =>
+    Math.abs(s.x - pugPos.x) >= 7 && Math.abs(s.y - pugPos.y) >= 7
+  );
+
+  // 2. Place RoachMothers (1 or 2)
+  const motherCount = Math.random() > 0.5 ? 2 : 1;
+  for (let i = 0; i < motherCount; i++) {
+    if (validEnemySpots.length > 0) {
+      initialConfigs.push({ type: 'roachMother', position: validEnemySpots.pop()!, movementOrder: movementOrder++ });
+    }
+  }
+
+  // 3. Place Roaches (5 to 8)
+  const roachCount = Math.floor(Math.random() * 4) + 5; // 5, 6, 7, or 8
+  for (let i = 0; i < roachCount; i++) {
+    if (validEnemySpots.length > 0) {
+      initialConfigs.push({ type: 'roach', position: validEnemySpots.pop()!, movementOrder: movementOrder++ });
+    }
+  }
+
+  return { layer0, layer1, initialConfigs };
+}
+
 function getCurrentTime(): string {
   const now = new Date();
   const hours = now.getHours().toString().padStart(2, '0');
   const minutes = now.getMinutes().toString().padStart(2, '0');
-  const seconds = now.getSeconds().toString().padStart(2, '0');
-  return `${hours}:${minutes}:${seconds}`;
+  return `${hours}:${minutes}`;
 }
 
 function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [prompt, setPrompt] = useState<string>('');
-  const [responseText, setResponseText] = useState<string>('');
-  const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth * 0.8 / GRID_WIDTH));
   const [gameLog, setGameLog] = useState<string[]>([]);
   const [turn, setTurn] = useState<number>(0);
   const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
+  const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth * 0.8 / GRID_WIDTH * 0.5));
 
+  // Level Data State
+  const [levelData] = useState<LevelData>(() => generateLevel(GRID_WIDTH, GRID_HEIGHT));
+
+  // Entity State
+  const [entities, setEntities] = useState<Entity[]>([]);
+  const [history, setHistory] = useState<Entity[][]>([]);
+
+  // Initialize entities from level data
+  useEffect(() => {
+    const newEntities = levelData.initialConfigs.map((c, index) => ({
+      id: Date.now() + index,
+      type: c.type as any,
+      position: { ...c.position },
+      movementOrder: c.movementOrder,
+      persona: createPersona(c.type)
+    }));
+    setEntities(newEntities);
+  }, [levelData]);
+
+  const [entityGrid, setEntityGrid] = useState<(string | number)[][]>(() => {
+    return Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
+  });
 
   useEffect(() => {
     const handleResize = () => {
-      setTileSize(Math.floor(window.innerWidth * 0.8 / GRID_WIDTH));
+      setTileSize(Math.floor(window.innerWidth * 0.8 / GRID_WIDTH * 0.5));
     };
     window.addEventListener('resize', handleResize);
-    handleResize(); // Initial calculation
+    handleResize();
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const [entities, setEntities] = useState<Entity[]>([
-    { id: 1, type: 'pug', persona: new Pug(), position: { x: 1, y: 1 } },
-    { id: 2, type: 'roach', persona: new Roach(), position: { x: 3, y: 3 } },
-    { id: 3, type: 'roach', persona: new Roach(), position: { x: 4, y: 4 } },
-    { id: 4, type: 'roachMother', persona: new RoachMother(), position: { x: 3, y: 1 } },
-  ]);   
-
-  const [entityGrid, setEntityGrid] = useState<(string | number)[][]>(() => {
-    const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));  
-    return newGrid;
-  });
-
-  // Generate a random seed once per component instance to vary the grass pattern
-  const seed = useMemo(() => Math.random() * 1000, []);
-
-  const layer0 = useMemo<number[][]>(() => {
-    return loadGrid(GRID_WIDTH, GRID_HEIGHT, seed);
-  }, [seed]);
-
-  // This effect synchronizes the entityGrid with the entities' positions
+  // Synchronize entityGrid
   useEffect(() => {
     const newGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
     for (const entity of entities) {
@@ -99,185 +219,223 @@ function HomeScreen() {
     setEntityGrid(newGrid);
   }, [entities]);
 
+  // Game Loop
   useEffect(() => {
     if (isLoading) return;
 
-    // Game Loop
     const runGameTurn = () => {
-      setGameLog(prev => [`${getCurrentTime()} Awaiting player move (use arrows or WASD)`, `${getCurrentTime()} Start turn ${turn + 1}`, ...prev].slice(0, 100));
-      // Player's turn
+      setGameLog(prev => [`${getCurrentTime()} Turn ${turn + 1}. Awaiting player move (arrows/WASD/numpad).`, ...prev].slice(0, 100));
       setAwaitingPlayerInput(true);
-      // The rest of the turn logic will be triggered by player input in the other useEffect
     };
 
     runGameTurn();
-    // The main game loop is now event-driven by player input, so no timeout is needed here.
   }, [isLoading, turn]);
 
-  const executeTurn = async (playerDirection: 'up' | 'down' | 'left' | 'right') => {
-    setAwaitingPlayerInput(false);
-    const intendedMoves: { entity: Entity, newPosition: Position }[] = [];
-    setGameLog(prev => [`${getCurrentTime()} Player move: ${playerDirection}`, ...prev].slice(0, 100));
+  const executeTurn = async (playerMove: { x: number, y: number }) => {
+    setHistory(prev => [...prev, entities]);
 
-    // 1. Calculate player's intended move
-    const player = entities.find(e => e.type === 'pug');
-    if (!player) return;
-    let { x: playerX, y: playerY } = player.position;
-    if (playerDirection === 'up') playerY--;
-    else if (playerDirection === 'down') playerY++;
-    else if (playerDirection === 'left') playerX--;
-    else if (playerDirection === 'right') playerX++;
-    intendedMoves.push({ entity: player, newPosition: { x: playerX, y: playerY } });
-
-    // 2. Calculate NPC moves sequentially, ordered by ID
-    const npcs = entities.filter(e => !e.persona.isPlayer).sort((a, b) => a.id - b.id);
-    const playerPosition = player.position;
-
-    for (const npc of npcs) {
-      setGameLog(prev => [`${getCurrentTime()} Awaiting ${npc.type} #${npc.id} move...`, ...prev].slice(0, 100));
-      let { x, y } = npc.position;
-
-      // LLM-driven movement
-      const deltaX = playerPosition.x - npc.position.x;
-      const deltaY = playerPosition.y - npc.position.y;
-
-      const horizontal = deltaX > 0 ? `${deltaX} steps right` : deltaX < 0 ? `${Math.abs(deltaX)} steps left` : '';
-      const vertical = deltaY > 0 ? `${deltaY} steps down` : deltaY < 0 ? `${Math.abs(deltaY)} steps up` : '';
-
-      let relativePosition = [vertical, horizontal].filter(Boolean).join(' and ');
-      if (!relativePosition) relativePosition = 'at your location';
-
-      const userPrompt = `${npc.persona.goal}\n${npc.persona.prompt}\nThe pug is ${relativePosition}.\nWhich direction will you move?`;
-      //setGameLog(prev => [`Calling LLM with prompt: ${userPrompt.replace(/\n/g, ' ')}`, ...prev].slice(0, 100));
-      const direction = (await getLLMNavigatorMove(SYSTEM_PROMPT, userPrompt)).toLowerCase();
-      // setGameLog(prev => [`${getCurrentTime()} Response from LLM: ${direction}`, ...prev].slice(0, 100));
-
-      // Translate direction to position change
-      if (direction.toLowerCase().includes('up')) y--;
-      else if (direction.toLowerCase().includes('down ')) y++;
-      else if (direction.toLowerCase().includes('left')) x--;
-      else if (direction.toLowerCase().includes('right')) x++;
-      setGameLog(prev => [`${getCurrentTime()} ${npc.type} intends to move: ${direction}`, ...prev].slice(0, 100));
-
-      intendedMoves.push({ entity: npc, newPosition: { x, y } });
+    // Initialize futureGrid with ALL current entity positions for collision detection
+    const futureGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
+    for (const e of entities) {
+      futureGrid[e.position.y][e.position.x] = e.type;
     }
 
-    // 3. Apply all moves simultaneously
-    setEntities(prevEntities => {
-      return prevEntities.map(e => {
-        const move = intendedMoves.find(m => m.entity.id === e.id);
-        console.log("Enemy move: ", e.id, move);
-        if (move) {
-          if (
-            move.newPosition.x >= 0 && move.newPosition.x < GRID_WIDTH &&
-            move.newPosition.y >= 0 && move.newPosition.y < GRID_HEIGHT
-          ) {
-            return { ...e, position: move.newPosition };
-          }
-        }
-        return e;
-      });
-    });
+    const nextEntities = entities.map(e => ({ ...e }));
+    const newLogs: string[] = [];
 
-    // 4. Log results and end turn
+    // 1. Move Player
+    const playerIndex = nextEntities.findIndex(e => e.persona.isPlayer);
+    if (playerIndex !== -1) {
+      const playerEntity = nextEntities[playerIndex];
+
+      // Remove self from futureGrid before moving
+      futureGrid[playerEntity.position.y][playerEntity.position.x] = 0;
+
+      const playerContext: MoveContext = {
+        entities: entities,
+        myPosition: playerEntity.position,
+        playerInput: playerMove,
+        layer1: levelData.layer1
+      };
+      const newPlayerPos = playerEntity.persona.move(playerContext, futureGrid);
+
+      // Update futureGrid with new position
+      futureGrid[newPlayerPos.y][newPlayerPos.x] = playerEntity.type;
+      playerEntity.position = newPlayerPos;
+
+      newLogs.push(`${getCurrentTime()} Pug move: (${newPlayerPos.x}, ${newPlayerPos.y})`);
+    }
+
+    // 2. Move Enemies
+    const contextEntities = nextEntities.map(e => ({ ...e }));
+    const enemies = nextEntities
+      .filter(e => !e.persona.isPlayer)
+      .sort((a, b) => a.movementOrder - b.movementOrder);
+
+    for (const entity of enemies) {
+      // Remove self from futureGrid before moving
+      futureGrid[entity.position.y][entity.position.x] = 0;
+
+      const context: MoveContext = {
+        entities: contextEntities,
+        myPosition: entity.position,
+        playerInput: undefined,
+        layer1: levelData.layer1
+      };
+
+      const newPos = entity.persona.move(context, futureGrid);
+
+      // Check if the move was blocked (position didn't change)
+      // Note: persona.move should return old pos if blocked, but we double check futureGrid just in case
+      // Actually, if persona.move returns a position that is occupied in futureGrid, it's a bug in persona.move
+      // But we update futureGrid regardless to reflect where the entity ENDS UP.
+
+      futureGrid[newPos.y][newPos.x] = entity.type;
+
+      if (newPos.x === entity.position.x && newPos.y === entity.position.y) {
+        newLogs.push(`${getCurrentTime()} ${entity.type} ${entity.movementOrder} move: (${entity.position.x}, ${entity.position.y}) (Blocked)`);
+      } else {
+        entity.position = newPos;
+        newLogs.push(`${getCurrentTime()} ${entity.type} ${entity.movementOrder} move: (${newPos.x}, ${newPos.y})`);
+      }
+    }
+
+    setEntities(nextEntities);
     setTurn(t => t + 1);
+    setGameLog(prev => [...newLogs.reverse(), ...prev].slice(0, 100));
+  };
+
+  const handleReset = () => {
+    // Restore initial entities from level data
+    const newEntities = levelData.initialConfigs.map((c, index) => ({
+      id: Date.now() + index,
+      type: c.type as any,
+      position: { ...c.position },
+      movementOrder: c.movementOrder,
+      persona: createPersona(c.type)
+    }));
+    setEntities(newEntities);
+    setHistory([]);
+    setTurn(0);
+    setGameLog([]);
     setAwaitingPlayerInput(true);
+  };
+
+  const handleUndo = () => {
+    if (history.length === 0) return;
+    const previousState = history[history.length - 1];
+    setEntities(previousState);
+    setHistory(prev => prev.slice(0, -1));
+    setTurn(t => Math.max(0, t - 1));
+    setGameLog(prev => [`${getCurrentTime()} Undo last move.`, ...prev].slice(0, 100));
   };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'r') { handleReset(); return; }
+      if (e.key.toLowerCase() === 'z') { handleUndo(); return; }
+
       if (awaitingPlayerInput) {
         const player = entities.find(e => e.persona.isPlayer);
         if (!player) return;
 
-        let direction: 'up' | 'down' | 'left' | 'right' | null = null;
-        if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') direction = 'up';
-        else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') direction = 'down';
-        else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') direction = 'left';
-        else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') direction = 'right';
-        else return; // Not a movement key
+        let moveVector: { x: number, y: number } | null = null;
+        if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') moveVector = { x: 0, y: -1 };
+        else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') moveVector = { x: 0, y: 1 };
+        else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') moveVector = { x: -1, y: 0 };
+        else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') moveVector = { x: 1, y: 0 };
+        else if (e.key === '1') moveVector = { x: -1, y: 1 };
+        else if (e.key === '2') moveVector = { x: 0, y: 1 };
+        else if (e.key === '3') moveVector = { x: 1, y: 1 };
+        else if (e.key === '4') moveVector = { x: -1, y: 0 };
+        else if (e.key === '5' || e.key === ' ') moveVector = { x: 0, y: 0 };
+        else if (e.key === '6') moveVector = { x: 1, y: 0 };
+        else if (e.key === '7') moveVector = { x: -1, y: -1 };
+        else if (e.key === '8') moveVector = { x: 0, y: -1 };
+        else if (e.key === '9') moveVector = { x: 1, y: -1 };
+        else return;
 
-        setAwaitingPlayerInput(false);
-        executeTurn(direction);
-        
-        if (direction) {
-          e.preventDefault(); // Prevent default browser action (scrolling)
+        if (moveVector) {
+          e.preventDefault();
           setAwaitingPlayerInput(false);
-          executeTurn(direction);
+          executeTurn(moveVector);
         }
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [awaitingPlayerInput, entities]);
+  }, [awaitingPlayerInput, entities, history]);
 
   if (isLoading) {
     return <LoadScreen onComplete={() => setIsLoading(false)} />;
   }
 
-  function _onKeyDown(e:React.KeyboardEvent<HTMLInputElement>) {
-    if(e.key === 'Enter' && prompt !== '') {
-      submitPrompt(
-        SYSTEM_MESSAGE,
-        prompt,
-        () => setResponseText(GENERATING),
-        (response, isFinal) => { if (isFinal) _onRespond(response); else setResponseText(response); },
-        false
-      );
-      setPrompt('');
+  function zoomIn() { setTileSize(prevSize => prevSize + 8); }
+  function zoomOut() { setTileSize(prevSize => Math.max(16, prevSize - 8)); }
+
+  const handleAddEnemy = async (prompt: string) => {
+    if (!prompt) return;
+    let type: 'roach' | 'roachMother' = 'roach';
+    if (prompt.toLowerCase().includes('mother') || prompt.toLowerCase().includes('flee')) {
+      type = 'roachMother';
     }
-  }
+    const maxMovementOrder = entities.reduce((max, e) => Math.max(max, e.movementOrder), -1);
 
-  function _onRespond(text:string) {
-    setResponseText(text + '\n');
-  }
+    // Find a valid empty spot for the new enemy
+    let spawnPos = { x: 8, y: 8 };
+    // Try 10 times to find an empty spot
+    for (let i = 0; i < 10; i++) {
+      const rx = Math.floor(Math.random() * GRID_WIDTH);
+      const ry = Math.floor(Math.random() * GRID_HEIGHT);
+      if (levelData.layer1[ry][rx] === 0 && !entities.some(e => e.position.x === rx && e.position.y === ry)) {
+        spawnPos = { x: rx, y: ry };
+        break;
+      }
+    }
 
-  function zoomIn() {
-    setTileSize(prevSize => prevSize + 8);
-  }
+    const newEnemy: Entity = {
+      id: Date.now(),
+      type: type,
+      position: spawnPos,
+      persona: createPersona(type),
+      movementOrder: maxMovementOrder + 1
+    };
 
-  function zoomOut() {
-    setTileSize(prevSize => Math.max(16, prevSize - 8)); // Don't allow zooming out smaller than 16px
-  }
+    setEntities(prev => [...prev, newEnemy]);
+    setGameLog(prev => [`${getCurrentTime()} Added new enemy '${newEnemy.type}' (order ${newEnemy.movementOrder})`, ...prev].slice(0, 100));
+  };
 
-  const response = responseText === GENERATING ? <p>hmmm<WaitingEllipsis/></p> : <p>{responseText}</p>
-  
   return (
     <div className={styles.container}>
       <TopBar />
       <div className={styles.content}>
         <div className={styles.mainArea}>
-          <Grid layer0={layer0} entityGrid={entityGrid} width={GRID_WIDTH} height={GRID_HEIGHT} tileSize={tileSize} />
-          <div className={styles.notificationArea} style={{ overflowY: 'auto' }}>
+          <Grid layer0={levelData.layer0} layer1={levelData.layer1} entityGrid={entityGrid} width={GRID_WIDTH} tileSize={tileSize} />
+          <div className={styles.notificationArea} style={{
+            overflowY: 'auto',
+            height: '300px',
+            border: '1px solid #ccc',
+            marginTop: '1rem',
+            padding: '0.5rem',
+            fontFamily: 'monospace',
+            fontSize: '0.8rem'
+          }}>
             {gameLog.map((msg, index) => (
-              <p
-                key={index}
-                style={{
-                  fontFamily: 'system-ui, sans-serif',
-                  fontSize: '0.8rem',
-                  padding: '0.2rem 0.5rem'
-                }}
-              >{msg}</p>
+              <p key={index} style={{ fontFamily: 'system-ui, sans-serif', fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>{msg}</p>
             ))}
           </div>
         </div>
         <div className={styles.controlsContainer}>
-          <div className={styles.prompt}>
-            <p><input type="text" className={styles.promptBox} placeholder="What now?" value={prompt} onKeyDown={_onKeyDown} onChange={(e) => setPrompt(e.target.value)} />
-            <ContentButton text="Send" onClick={() => {
-              submitPrompt(
-                'You are sidekick for Beethro the pug. You like to tell jokes',
-                prompt,
-                () => setResponseText(GENERATING),
-                (response, isFinal) => { if (isFinal) _onRespond(response); else setResponseText(response); },
-                false
-              );
-              setPrompt('');
-            }} />
+          <div>
+            <input
+              type="text"
+              className={styles.promptBox}
+              placeholder="Type 'roach' or 'mother'..."
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAddEnemy(e.currentTarget.value); }}
+            />
+            <ContentButton text="Add Enemy" onClick={() => handleAddEnemy((document.querySelector(`.${styles.promptBox}`) as HTMLInputElement).value)} />
             <ContentButton text="Zoom In" onClick={zoomIn} />
-            <ContentButton text="Zoom Out" onClick={zoomOut} /></p>
-            {response}
+            <ContentButton text="Zoom Out" onClick={zoomOut} />
           </div>
         </div>
       </div>

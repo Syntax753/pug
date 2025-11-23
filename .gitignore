@@ -30,3 +30,6 @@ src/assets/layer*/
 *.njsproj
 *.sln
 *.sw?
+
+# TypeScript
+*.tsbuildinfo
