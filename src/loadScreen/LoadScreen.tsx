@@ -31,6 +31,22 @@ function LoadScreen(props: Props) {
       .then((isInitialized) => { if (isInitialized) onComplete(); });
   }, [isReadyToLoad, modelId]);
 
+  const loadingMessages = [
+    "Pixelating sprites...",
+    "Generating levels...",
+    "Spawning monsters...",
+    "Calibrating Pug cuteness...",
+    "Sharpening walls...",
+    "Hiding snacks...",
+    "Calculating escape routes...",
+    "Waking up the Roach Mother...",
+    "Polishing pixels...",
+    "Preparing for adventure..."
+  ];
+
+  const messageIndex = Math.min(Math.floor(percentComplete * 10), 9);
+  const customMessage = loadingMessages[messageIndex];
+
   const statusContent = wasLoadCancelled ? (
     <div className={styles.cancelledMessage}>
       <p>Model loading was cancelled.</p>
@@ -46,10 +62,38 @@ function LoadScreen(props: Props) {
           <p>and you must escape each room.</p>
         </div>
         <h2>Good Luck!</h2>
+
+        <div className={styles.controlsLayout}>
+          <div className={styles.movementGrid}>
+            <div className={styles.key}>7</div>
+            <div className={styles.key}>8</div>
+            <div className={styles.key}>9</div>
+            <div className={styles.key}>4</div>
+            <div className={styles.centerKey}>
+              <img src={pugImage} alt="Pug" className={styles.controlPug} />
+            </div>
+            <div className={styles.key}>6</div>
+            <div className={styles.key}>1</div>
+            <div className={styles.key}>2</div>
+            <div className={styles.key}>3</div>
+          </div>
+
+          <div className={styles.actionKeys}>
+            <div className={styles.actionRow}>
+              <div className={styles.key}>R</div>
+              <span>Reset Level</span>
+            </div>
+            <div className={styles.actionRow}>
+              <div className={styles.key}>Z</div>
+              <span>Undo Move</span>
+            </div>
+          </div>
+        </div>
+
       </div>
       <div className={styles.progressBarContainer}>
         <ProgressBar percentComplete={percentComplete} />
-        {currentTask}
+        <p className={styles.loadingText}>{customMessage}</p>
       </div>
     </div>
   );

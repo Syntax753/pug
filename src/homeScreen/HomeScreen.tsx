@@ -234,7 +234,12 @@ function HomeScreen() {
   const executeTurn = async (playerMove: { x: number, y: number }) => {
     setHistory(prev => [...prev, entities]);
 
+    // Initialize futureGrid with ALL current entity positions for collision detection
     const futureGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
+    for (const e of entities) {
+      futureGrid[e.position.y][e.position.x] = e.type;
+    }
+
     const nextEntities = entities.map(e => ({ ...e }));
     const newLogs: string[] = [];
 
@@ -242,6 +247,10 @@ function HomeScreen() {
     const playerIndex = nextEntities.findIndex(e => e.persona.isPlayer);
     if (playerIndex !== -1) {
       const playerEntity = nextEntities[playerIndex];
+
+      // Remove self from futureGrid before moving
+      futureGrid[playerEntity.position.y][playerEntity.position.x] = 0;
+
       const playerContext: MoveContext = {
         entities: entities,
         myPosition: playerEntity.position,
@@ -249,7 +258,11 @@ function HomeScreen() {
         layer1: levelData.layer1
       };
       const newPlayerPos = playerEntity.persona.move(playerContext, futureGrid);
+
+      // Update futureGrid with new position
+      futureGrid[newPlayerPos.y][newPlayerPos.x] = playerEntity.type;
       playerEntity.position = newPlayerPos;
+
       newLogs.push(`${getCurrentTime()} Pug move: (${newPlayerPos.x}, ${newPlayerPos.y})`);
     }
 
@@ -260,6 +273,9 @@ function HomeScreen() {
       .sort((a, b) => a.movementOrder - b.movementOrder);
 
     for (const entity of enemies) {
+      // Remove self from futureGrid before moving
+      futureGrid[entity.position.y][entity.position.x] = 0;
+
       const context: MoveContext = {
         entities: contextEntities,
         myPosition: entity.position,
@@ -268,13 +284,17 @@ function HomeScreen() {
       };
 
       const newPos = entity.persona.move(context, futureGrid);
-      const occupiedByEntity = futureGrid[newPos.y]?.[newPos.x];
 
-      if (occupiedByEntity && typeof occupiedByEntity === 'string') {
-        futureGrid[entity.position.y][entity.position.x] = entity.type;
+      // Check if the move was blocked (position didn't change)
+      // Note: persona.move should return old pos if blocked, but we double check futureGrid just in case
+      // Actually, if persona.move returns a position that is occupied in futureGrid, it's a bug in persona.move
+      // But we update futureGrid regardless to reflect where the entity ENDS UP.
+
+      futureGrid[newPos.y][newPos.x] = entity.type;
+
+      if (newPos.x === entity.position.x && newPos.y === entity.position.y) {
         newLogs.push(`${getCurrentTime()} ${entity.type} ${entity.movementOrder} move: (${entity.position.x}, ${entity.position.y}) (Blocked)`);
       } else {
-        futureGrid[newPos.y][newPos.x] = entity.type;
         entity.position = newPos;
         newLogs.push(`${getCurrentTime()} ${entity.type} ${entity.movementOrder} move: (${newPos.x}, ${newPos.y})`);
       }
