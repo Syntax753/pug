@@ -43,47 +43,62 @@ function loadGrid(width: number, height: number, seed: number): number[][] {
 
 function generateLayer1(width: number, height: number, seed: number): number[][] {
   const newGrid = Array(height).fill(0).map(() => Array(width).fill(0));
-  // Simple pseudo-random generator based on seed
-  let currentSeed = seed;
-  const random = () => {
-    const x = Math.sin(currentSeed++) * 10000;
-    return x - Math.floor(x);
+
+  // Helper to place a wall
+  const placeWall = (x: number, y: number) => {
+    if (x >= 0 && x < width && y >= 0 && y < height) {
+      newGrid[y][x] = 92;
+    }
   };
 
-  // Add walls in top right cluster (so pug can hide from enemies)
-  const topRightWalls = [
-    { x: 14, y: 0 }, { x: 15, y: 0 }, { x: 16, y: 0 }, { x: 17, y: 0 }, { x: 18, y: 0 }, { x: 19, y: 0 },
-    { x: 14, y: 1 }, { x: 19, y: 1 },
-    { x: 14, y: 2 }, { x: 19, y: 2 },
-    { x: 14, y: 3 }, { x: 19, y: 3 },
-    { x: 14, y: 4 }
-  ];
-
-  for (const wall of topRightWalls) {
-    if (wall.x < width && wall.y < height) {
-      newGrid[wall.y][wall.x] = 92;
-    }
+  // 1. Border Walls
+  for (let x = 0; x < width; x++) {
+    placeWall(x, 0);
+    placeWall(x, height - 1);
+  }
+  for (let y = 0; y < height; y++) {
+    placeWall(0, y);
+    placeWall(width - 1, y);
   }
 
-  let obstaclesPlaced = 0;
-  while (obstaclesPlaced < 5) {
-    const x = Math.floor(random() * width);
-    const y = Math.floor(random() * height);
-
-    // Avoid initial entity positions
-    if ((x === 2 && y === 2) || (x === 4 && y === 16) || (x === 14 && y === 16) || (x === 16 && y === 4)) {
-      continue;
-    }
-    // Avoid top right cluster
-    if (x >= 14 && y <= 4) {
-      continue;
-    }
-
-    if (newGrid[y][x] === 0) {
-      newGrid[y][x] = 92;
-      obstaclesPlaced++;
-    }
+  // 2. Room Dividers (creating 4 corner rooms)
+  // Vertical walls at x=7 and x=12
+  for (let y = 1; y < 7; y++) {
+    placeWall(7, y);  // Top-Left Room vertical boundary
+    placeWall(12, y); // Top-Right Room vertical boundary
   }
+  for (let y = 13; y < 19; y++) {
+    placeWall(7, y);  // Bottom-Left Room vertical boundary
+    placeWall(12, y); // Bottom-Right Room vertical boundary
+  }
+
+  // Horizontal walls at y=7 and y=12
+  for (let x = 1; x < 7; x++) {
+    placeWall(x, 7);  // Top-Left Room horizontal boundary
+    placeWall(x, 12); // Bottom-Left Room horizontal boundary
+  }
+  for (let x = 13; x < 19; x++) {
+    placeWall(x, 7);  // Top-Right Room horizontal boundary
+    placeWall(x, 12); // Bottom-Right Room horizontal boundary
+  }
+
+  // 3. Doorways (gaps in the walls)
+  // Top-Left Room
+  newGrid[3][7] = 0; // Door to center (East)
+  newGrid[7][3] = 0; // Door to center (South)
+
+  // Top-Right Room
+  newGrid[3][12] = 0; // Door to center (West)
+  newGrid[7][16] = 0; // Door to center (South)
+
+  // Bottom-Left Room
+  newGrid[16][7] = 0; // Door to center (East)
+  newGrid[12][3] = 0; // Door to center (North)
+
+  // Bottom-Right Room
+  newGrid[16][12] = 0; // Door to center (West)
+  newGrid[12][16] = 0; // Door to center (North)
+
   return newGrid;
 }
 
@@ -166,14 +181,13 @@ function HomeScreen() {
     // Save current state to history before moving
     setHistory(prev => [...prev, entities]);
 
-    const moveDesc = playerMove.x === 0 && playerMove.y === 0 ? 'skip' : `(${playerMove.x}, ${playerMove.y})`;
-    setGameLog(prev => [`${getCurrentTime()} Player move: ${moveDesc}`, ...prev].slice(0, 100));
-
     // Initialize future grid (empty for entities)
     const futureGrid = Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
 
     // Create a copy of entities to update positions
     const nextEntities = entities.map(e => ({ ...e }));
+
+    const newLogs: string[] = [];
 
     // 1. Find Player and calculate their move FIRST
     const playerIndex = nextEntities.findIndex(e => e.persona.isPlayer);
@@ -187,6 +201,9 @@ function HomeScreen() {
       };
       const newPlayerPos = playerEntity.persona.move(playerContext, futureGrid);
       playerEntity.position = newPlayerPos;
+
+      // Log Player Move
+      newLogs.push(`${getCurrentTime()} Pug move: (${newPlayerPos.x}, ${newPlayerPos.y})`);
     }
 
     // 2. Create a context with the Player's NEW position for the enemies
@@ -215,10 +232,12 @@ function HomeScreen() {
         // Position is occupied, stay at current position
         futureGrid[entity.position.y][entity.position.x] = entity.type;
         // Don't update entity.position
+        newLogs.push(`${getCurrentTime()} ${entity.type} ${entity.movementOrder} move: (${entity.position.x}, ${entity.position.y}) (Blocked)`);
       } else {
         // Position is free, move there
         futureGrid[newPos.y][newPos.x] = entity.type;
         entity.position = newPos;
+        newLogs.push(`${getCurrentTime()} ${entity.type} ${entity.movementOrder} move: (${newPos.x}, ${newPos.y})`);
       }
     }
 
@@ -226,6 +245,9 @@ function HomeScreen() {
     // entityGrid will be updated by the useEffect
 
     setTurn(t => t + 1);
+
+    // Update logs in reverse order so newest is at top
+    setGameLog(prev => [...newLogs.reverse(), ...prev].slice(0, 100));
   };
 
   const handleReset = () => {
