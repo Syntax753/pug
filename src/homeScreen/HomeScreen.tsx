@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import ContentButton from '@/components/contentButton/ContentButton';
 import LoadScreen from '@/loadScreen/LoadScreen';
@@ -49,7 +49,7 @@ function loadGrid(width: number, height: number, seed: number): number[][] {
   return newGrid;
 }
 
-function generateLayer1(width: number, height: number, seed: number): number[][] {
+function generateLayer1(width: number, height: number): number[][] {
   const newGrid = Array(height).fill(0).map(() => Array(width).fill(0));
 
   const placeWall = (x: number, y: number) => {
@@ -109,7 +109,7 @@ type LevelData = {
 function generateLevel(width: number, height: number): LevelData {
   const seed = Math.random() * 1000;
   const layer0 = loadGrid(width, height, seed);
-  const layer1 = generateLayer1(width, height, seed);
+  const layer1 = generateLayer1(width, height);
 
   // Find all valid empty spots
   const emptySpots: { x: number, y: number }[] = [];

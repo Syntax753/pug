@@ -18,7 +18,6 @@ function LoadScreen(props: Props) {
   const [wasLoadCancelled, setWasLoadCancelled] = useState<boolean>(false);
   const [modalDialogName, setModalDialogName] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string>('');
-  const [currentTask, setCurrentTask] = useState('Loading');
   const [problems, setProblems] = useState<ModelDeviceProblem[] | null>(null);
   const { onComplete } = props;
 
@@ -27,7 +26,7 @@ function LoadScreen(props: Props) {
       init(setModelId, setProblems, setModalDialogName).then(setIsReadyToLoad);
       return;
     }
-    startLoadingModel(modelId, setPercentComplete, setCurrentTask)
+    startLoadingModel(modelId, setPercentComplete, () => { })
       .then((isInitialized) => { if (isInitialized) onComplete(); });
   }, [isReadyToLoad, modelId]);
 
