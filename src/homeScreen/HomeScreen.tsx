@@ -61,43 +61,38 @@ function generateLayer1(width: number, height: number, seed: number): number[][]
     placeWall(width - 1, y);
   }
 
-  // 2. Room Dividers (creating 4 corner rooms)
-  // Vertical walls at x=7 and x=12
-  for (let y = 1; y < 7; y++) {
-    placeWall(7, y);  // Top-Left Room vertical boundary
-    placeWall(12, y); // Top-Right Room vertical boundary
-  }
-  for (let y = 13; y < 19; y++) {
-    placeWall(7, y);  // Bottom-Left Room vertical boundary
-    placeWall(12, y); // Bottom-Right Room vertical boundary
+  // 2. Intricate Maze Walls
+  // Vertical Spines
+  for (let y = 2; y < 18; y++) {
+    if (y !== 4 && y !== 15) placeWall(5, y);  // Wall at x=5 with gaps
+    if (y !== 2 && y !== 17 && (y < 8 || y > 11)) placeWall(10, y); // Wall at x=10 (avoiding center room)
+    if (y !== 4 && y !== 15) placeWall(15, y); // Wall at x=15 with gaps
   }
 
-  // Horizontal walls at y=7 and y=12
-  for (let x = 1; x < 7; x++) {
-    placeWall(x, 7);  // Top-Left Room horizontal boundary
-    placeWall(x, 12); // Bottom-Left Room horizontal boundary
-  }
-  for (let x = 13; x < 19; x++) {
-    placeWall(x, 7);  // Top-Right Room horizontal boundary
-    placeWall(x, 12); // Bottom-Right Room horizontal boundary
+  // Horizontal Spines
+  for (let x = 2; x < 18; x++) {
+    if (x !== 2 && x !== 17 && (x < 8 || x > 11)) placeWall(x, 5);  // Wall at y=5 (avoiding center)
+    if (x !== 5 && x !== 15) placeWall(x, 10); // Wall at y=10 (crossing center)
+    if (x !== 2 && x !== 17 && (x < 8 || x > 11)) placeWall(x, 15); // Wall at y=15 (avoiding center)
   }
 
-  // 3. Doorways (gaps in the walls)
-  // Top-Left Room
-  newGrid[3][7] = 0; // Door to center (East)
-  newGrid[7][3] = 0; // Door to center (South)
+  // Extra maze details to break up long corridors
+  placeWall(2, 8); placeWall(3, 8);
+  placeWall(17, 12); placeWall(16, 12);
+  placeWall(7, 2); placeWall(7, 3);
+  placeWall(12, 17); placeWall(12, 16);
 
-  // Top-Right Room
-  newGrid[3][12] = 0; // Door to center (West)
-  newGrid[7][16] = 0; // Door to center (South)
-
-  // Bottom-Left Room
-  newGrid[16][7] = 0; // Door to center (East)
-  newGrid[12][3] = 0; // Door to center (North)
-
-  // Bottom-Right Room
-  newGrid[16][12] = 0; // Door to center (West)
-  newGrid[12][16] = 0; // Door to center (North)
+  // Clear Center Room (8,8) to (11,11)
+  for (let y = 8; y <= 11; y++) {
+    for (let x = 8; x <= 11; x++) {
+      newGrid[y][x] = 0;
+    }
+  }
+  // Add center room entrances
+  newGrid[8][9] = 0; newGrid[8][10] = 0; // Top
+  newGrid[11][9] = 0; newGrid[11][10] = 0; // Bottom
+  newGrid[9][8] = 0; newGrid[10][8] = 0; // Left
+  newGrid[9][11] = 0; newGrid[10][11] = 0; // Right
 
   return newGrid;
 }
@@ -122,9 +117,14 @@ function HomeScreen() {
   // Factory function for initial entities to ensure fresh instances on reset
   const getInitialEntities = (): Entity[] => [
     { id: 1, type: 'pug', persona: new Pug(), position: { x: 2, y: 2 }, movementOrder: 0 },
-    { id: 2, type: 'roach', persona: new Roach(), position: { x: 4, y: 16 }, movementOrder: 1 },
-    { id: 3, type: 'roach', persona: new Roach(), position: { x: 14, y: 16 }, movementOrder: 2 },
-    { id: 4, type: 'roachMother', persona: new RoachMother(), position: { x: 16, y: 4 }, movementOrder: 3 },
+    // Roaches scattered in the maze
+    { id: 2, type: 'roach', persona: new Roach(), position: { x: 8, y: 9 }, movementOrder: 1 }, // Center
+    { id: 3, type: 'roach', persona: new Roach(), position: { x: 17, y: 2 }, movementOrder: 2 }, // Top Right
+    { id: 4, type: 'roach', persona: new Roach(), position: { x: 2, y: 17 }, movementOrder: 3 }, // Bottom Left
+    { id: 5, type: 'roach', persona: new Roach(), position: { x: 12, y: 7 }, movementOrder: 4 }, // Mid Right
+    { id: 6, type: 'roach', persona: new Roach(), position: { x: 7, y: 13 }, movementOrder: 5 }, // Mid Left
+    // Mother in the bottom right room
+    { id: 7, type: 'roachMother', persona: new RoachMother(), position: { x: 17, y: 17 }, movementOrder: 6 },
   ];
 
   // Simplified entity state
