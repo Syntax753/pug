@@ -20,22 +20,25 @@ Return ONLY a JSON object with these fields:
 - name: string (Use the full descriptive name, e.g., "Happy Horse", "Giggly Ghost")
 - attitude: "towards" | "away" | "random" (default: "towards")
 - fly: boolean (true if it can fly over walls/obstacles, false otherwise)
-- directions: "all" | "ortho" (default: "all")
+- movementPattern: Array of {x, y} objects representing possible moves relative to (0,0)
+  - Default (all): [{x:0,y:1},{x:0,y:-1},{x:1,y:0},{x:-1,y:0},{x:1,y:1},{x:1,y:-1},{x:-1,y:1},{x:-1,y:-1}]
+  - Ortho: [{x:0,y:1},{x:0,y:-1},{x:1,y:0},{x:-1,y:0}]
+  - Knight: [{x:1,y:2},{x:1,y:-2},{x:-1,y:2},{x:-1,y:-2},{x:2,y:1},{x:2,y:-1},{x:-2,y:1},{x:-2,y:-1}]
 - preference: "vertical" | "horizontal" | "none" (movement axis preference)
 
 EXAMPLES:
 User: "Create a ghost that flies through walls and chases the pug in straight lines"
-JSON: { "name": "Ghost", "attitude": "towards", "fly": true, "directions": "ortho", "preference": "none" }
+JSON: { "name": "Ghost", "attitude": "towards", "fly": true, "movementPattern": [{"x":0,"y":1},{"x":0,"y":-1},{"x":1,"y":0},{"x":-1,"y":0}], "preference": "none" }
 
 User: "A scared rat that runs away horizontally"
-JSON: { "name": "Rat", "attitude": "away", "fly": false, "directions": "ortho", "preference": "horizontal" }
+JSON: { "name": "Rat", "attitude": "away", "fly": false, "movementPattern": [{"x":0,"y":1},{"x":0,"y":-1},{"x":1,"y":0},{"x":-1,"y":0}], "preference": "horizontal" }
 `;
 
 interface EnemyParams {
   name: string;
   attitude: 'towards' | 'away' | 'random';
   fly: boolean;
-  directions: 'all' | 'ortho';
+  movementPattern: { x: number, y: number }[];
   preference: 'vertical' | 'horizontal' | 'none';
 }
 
@@ -43,79 +46,24 @@ interface EnemyParams {
  * Generate the JavaScript move() code based on parameters
  */
 function generateMoveCode(params: EnemyParams): string {
-  const { attitude, fly, directions, preference } = params;
+  const { attitude, fly, movementPattern, preference } = params;
 
-  if (attitude === 'random') {
-    return `
-      // Random movement
-      const dirs = [
-        {x:0, y:1}, {x:0, y:-1}, {x:1, y:0}, {x:-1, y:0}
-        ${directions === 'all' ? ', {x:1, y:1}, {x:1, y:-1}, {x:-1, y:1}, {x:-1, y:-1}' : ''}
-      ];
-      // Shuffle directions
-      for (let i = dirs.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
-      }
-      
-      for (const dir of dirs) {
-        const newX = context.myPosition.x + dir.x;
-        const newY = context.myPosition.y + dir.y;
-        
-        // Check bounds
-        if (newX < 0 || newX >= 20 || newY < 0 || newY >= 20) continue;
-        
-        // Check collision
-        if (futureGrid[newY][newX] !== 0) continue;
-        
-        // Check walls (unless flying)
-        ${fly ? '// Flying ignores walls' : 'if (context.layer1[newY][newX] === 92) continue;'}
-        
-        return {x: newX, y: newY};
-      }
-      return context.myPosition;
-    `;
-  }
+  // Serialize movement pattern for injection into code
+  const patternJson = JSON.stringify(movementPattern);
 
-  // Logic for seeking/fleeing
   return `
     const pug = context.entities.find(e => e.type === 'pug');
-    if (!pug) return context.myPosition;
-
-    let dx = pug.position.x - context.myPosition.x;
-    let dy = pug.position.y - context.myPosition.y;
-
-    ${attitude === 'away' ? '// Run away!\n    dx = -dx;\n    dy = -dy;' : '// Seek player'}
-
-    const moves = [];
+    const targetPos = pug ? pug.position : context.myPosition; // Default to self if no pug (for random)
     
-    // Determine move priority based on preference
-    const tryHoriz = dx !== 0;
-    const tryVert = dy !== 0;
+    // Possible moves relative to current position
+    const patterns = ${patternJson};
     
-    // Orthogonal moves
-    if (tryHoriz) moves.push({x: Math.sign(dx), y: 0});
-    if (tryVert) moves.push({x: 0, y: Math.sign(dy)});
+    // Calculate all valid candidate moves
+    const candidates = [];
     
-    // Diagonal moves (only if allowed)
-    ${directions === 'all' ? `
-    if (tryHoriz && tryVert) {
-      moves.push({x: Math.sign(dx), y: Math.sign(dy)});
-    }` : ''}
-    
-    // Sort moves based on preference
-    ${preference === 'vertical'
-      ? `// Prefer vertical
-         moves.sort((a, b) => Math.abs(b.y) - Math.abs(a.y));`
-      : preference === 'horizontal'
-        ? `// Prefer horizontal
-         moves.sort((a, b) => Math.abs(b.x) - Math.abs(a.x));`
-        : ''
-    }
-
-    for (const move of moves) {
-      const newX = context.myPosition.x + move.x;
-      const newY = context.myPosition.y + move.y;
+    for (const pat of patterns) {
+      const newX = context.myPosition.x + pat.x;
+      const newY = context.myPosition.y + pat.y;
       
       // Check bounds
       if (newX < 0 || newX >= 20 || newY < 0 || newY >= 20) continue;
@@ -126,10 +74,44 @@ function generateMoveCode(params: EnemyParams): string {
       // Check walls (unless flying)
       ${fly ? '// Flying ignores walls' : 'if (context.layer1[newY][newX] === 92) continue;'}
       
-      return {x: newX, y: newY};
+      candidates.push({x: newX, y: newY});
     }
     
-    return context.myPosition;
+    if (candidates.length === 0) return context.myPosition;
+    
+    ${attitude === 'random' ? `
+      // Random movement: just pick a random valid candidate
+      const idx = Math.floor(Math.random() * candidates.length);
+      return candidates[idx];
+    ` : `
+      // Sort candidates based on attitude and preference
+      candidates.sort((a, b) => {
+        // 1. Calculate squared distance to target
+        const distA = Math.pow(a.x - targetPos.x, 2) + Math.pow(a.y - targetPos.y, 2);
+        const distB = Math.pow(b.x - targetPos.x, 2) + Math.pow(b.y - targetPos.y, 2);
+        
+        // Primary sort: Distance
+        if (distA !== distB) {
+          ${attitude === 'towards' ? 'return distA - distB;' : 'return distB - distA;'}
+        }
+        
+        // Secondary sort: Preference (Tie-breaker)
+        ${preference === 'vertical'
+      ? `// Prefer vertical movement (larger Y change)
+             const dY_A = Math.abs(a.y - context.myPosition.y);
+             const dY_B = Math.abs(b.y - context.myPosition.y);
+             return dY_B - dY_A;`
+      : preference === 'horizontal'
+        ? `// Prefer horizontal movement (larger X change)
+             const dX_A = Math.abs(a.x - context.myPosition.x);
+             const dX_B = Math.abs(b.x - context.myPosition.x);
+             return dX_B - dX_A;`
+        : 'return 0;'
+    }
+      });
+      
+      return candidates[0];
+    `}
   `;
 }
 
@@ -164,7 +146,13 @@ export async function generateEnemyBehavior(
   } catch (e) {
     console.error('Failed to parse JSON from LLM:', e);
     // Fallback default
-    params = { name: 'Unknown', attitude: 'towards', fly: false, directions: 'all', preference: 'vertical' };
+    params = {
+      name: 'Unknown',
+      attitude: 'towards',
+      fly: false,
+      movementPattern: [{ x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }], // Default ortho
+      preference: 'vertical'
+    };
   }
 
   console.log('Parsed Params:', params);
