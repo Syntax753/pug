@@ -15,33 +15,21 @@ GAME CONTEXT:
 - There is a player character called "pug" 
 - Enemies move once per turn after the player
 - Position is {x, y} where x is column (0-19) and y is row (0-19)
-- layer1 tiles with value 92 are walls that block movement
-- futureGrid tracks where entities will be after moving (to prevent collisions)
 
 MOVE METHOD SIGNATURE:
-The move() method you generate should have this signature:
 move(context, futureGrid)
 
 CONTEXT OBJECT:
-- context.entities: Array of all entities in the game
-  - Each entity has: {id, type, position: {x, y}, persona, movementOrder}
-  - The pug has type === 'pug'
+- context.entities: Array of all entities {id, type, position: {x, y}, ...}
 - context.myPosition: Current position {x, y} of this enemy
-- context.layer1: 2D array where layer1[y][x] === 92 means wall
-- context.playerInput: undefined for enemies (only used by player)
-
-FUTUREGRID:
-- 2D array showing where entities will be this turn
-- futureGrid[y][x] === 0 means empty
-- futureGrid[y][x] === entity.type means occupied
+- context.isValid(x, y): Helper function returning true if position (x,y) is valid and empty
+- context.layer1: 2D array of walls (92 = wall)
 
 REQUIREMENTS:
 1. Return a position object: {x, y}
-2. Check bounds: x must be 0-19, y must be 0-19
-3. Respect walls: context.layer1[y][x] === 92 blocks movement
-4. Respect entities: futureGrid[y][x] !== 0 means occupied
-5. If blocked, return current position (context.myPosition)
-6. By default, prefer vertical movement over horizontal when blocked diagonally
+2. Use context.isValid(x, y) to check if a move is possible
+3. If blocked, return current position (context.myPosition)
+4. By default, prefer vertical movement over horizontal when blocked diagonally
 
 EXAMPLES:
 
@@ -52,36 +40,25 @@ if (!pug) return context.myPosition;
 const dx = pug.position.x - context.myPosition.x;
 const dy = pug.position.y - context.myPosition.y;
 
-const isValid = (x, y) => {
-  if (x < 0 || x >= 20 || y < 0 || y >= 20) return false;
-  if (context.layer1[y][x] === 92) return false;
-  if (futureGrid[y][x] !== 0) return false;
-  return true;
-};
-
 // Try diagonal
-let newX = context.myPosition.x + (dx !== 0 ? Math.sign(dx) : 0);
-let newY = context.myPosition.y + (dy !== 0 ? Math.sign(dy) : 0);
-
-if (isValid(newX, newY)) {
-  return {x: newX, y: newY};
-}
+const newX = context.myPosition.x + Math.sign(dx);
+const newY = context.myPosition.y + Math.sign(dy);
+if (context.isValid(newX, newY)) return {x: newX, y: newY};
 
 // Try vertical first
-if (dy !== 0 && isValid(context.myPosition.x, context.myPosition.y + Math.sign(dy))) {
+if (dy !== 0 && context.isValid(context.myPosition.x, context.myPosition.y + Math.sign(dy))) {
   return {x: context.myPosition.x, y: context.myPosition.y + Math.sign(dy)};
 }
 
 // Try horizontal
-if (dx !== 0 && isValid(context.myPosition.x + Math.sign(dx), context.myPosition.y)) {
+if (dx !== 0 && context.isValid(context.myPosition.x + Math.sign(dx), context.myPosition.y)) {
   return {x: context.myPosition.x + Math.sign(dx), y: context.myPosition.y};
 }
 
 return context.myPosition;
 
 YOUR TASK:
-Generate ONLY the function body (the code inside the move function). Do NOT include the function declaration or closing brace.
-Return plain JavaScript code without markdown formatting.`;
+Generate ONLY the function body. Keep it CONCISE. Do NOT include function declaration or markdown.`;
 
 /**
  * Generate enemy move() code from natural language

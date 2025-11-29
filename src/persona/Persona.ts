@@ -12,6 +12,7 @@ export interface MoveContext {
     myPosition: Position;
     playerInput?: { x: number, y: number };
     layer1: number[][];
+    isValid: (x: number, y: number) => boolean;
 }
 
 export default interface Persona {

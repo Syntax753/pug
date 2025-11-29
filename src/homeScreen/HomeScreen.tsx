@@ -259,7 +259,12 @@ function HomeScreen() {
         entities: entities,
         myPosition: playerEntity.position,
         playerInput: playerMove,
-        layer1: levelData.layer1
+        layer1: levelData.layer1,
+        isValid: (x: number, y: number) => {
+          return x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT &&
+            levelData.layer1[y][x] !== 92 &&
+            futureGrid[y][x] === 0;
+        }
       };
       const newPlayerPos = playerEntity.persona.move(playerContext, futureGrid);
 
@@ -284,7 +289,12 @@ function HomeScreen() {
         entities: contextEntities,
         myPosition: entity.position,
         playerInput: undefined,
-        layer1: levelData.layer1
+        layer1: levelData.layer1,
+        isValid: (x: number, y: number) => {
+          return x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT &&
+            levelData.layer1[y][x] !== 92 &&
+            futureGrid[y][x] === 0;
+        }
       };
 
       const newPos = entity.persona.move(context, futureGrid);
@@ -450,18 +460,21 @@ function HomeScreen() {
             <Grid layer0={levelData.layer0} layer1={levelData.layer1} entityGrid={entityGrid} width={GRID_WIDTH} tileSize={tileSize} />
 
             <div className={styles.controlsRow}>
-              <input
-                type="text"
-                className={styles.promptBox}
-                placeholder="Describe an enemy (e.g., 'Create a Scarab that seeks the pug')..."
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !isGeneratingEnemy) {
-                    handleAddEnemy(e.currentTarget.value);
-                    e.currentTarget.value = '';
-                  }
-                }}
-                disabled={isGeneratingEnemy}
-              />
+              <div className={styles.inputWrapper}>
+                <input
+                  type="text"
+                  className={styles.promptBox}
+                  placeholder="Describe an enemy (e.g., 'Create a Scarab that seeks the pug')..."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isGeneratingEnemy) {
+                      handleAddEnemy(e.currentTarget.value);
+                      e.currentTarget.value = '';
+                    }
+                  }}
+                  disabled={isGeneratingEnemy}
+                />
+                {isGeneratingEnemy && <p className={styles.statusText}>{generationStatus}</p>}
+              </div>
               <ContentButton
                 text={isGeneratingEnemy ? "Generating..." : "Generate"}
                 onClick={() => {
@@ -473,7 +486,6 @@ function HomeScreen() {
                 }}
               />
             </div>
-            {isGeneratingEnemy && <p className={styles.statusText}>{generationStatus}</p>}
           </div>
 
           <div className={styles.notificationArea} style={{
