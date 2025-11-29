@@ -25,8 +25,14 @@ class DynamicPersona implements Persona {
         this.enemyName = enemyName;
         this.goal = goal || `Custom behavior: ${enemyName}`;
 
-        // Generate sprite from first letter of enemy name
-        const sprite = generateLetterSprite(enemyName);
+        // Generate sprite from initials of enemy name
+        const initials = enemyName
+            .split(' ')
+            .map(word => word.charAt(0))
+            .join('')
+            .substring(0, 3); // Limit to 3 chars
+
+        const sprite = generateLetterSprite(initials);
         this.avatar = {
             North: sprite,
             East: sprite,

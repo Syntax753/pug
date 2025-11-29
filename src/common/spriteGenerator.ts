@@ -24,11 +24,12 @@ function hashCode(str: string): number {
  * @param size - Size of the sprite in pixels (default 64)
  * @returns Data URL of the generated sprite
  */
-export function generateLetterSprite(letter: string, size: number = 64): string {
-    const char = letter.charAt(0).toUpperCase();
+export function generateLetterSprite(text: string, size: number = 64): string {
+    // Use up to 3 characters, uppercase
+    const chars = text.slice(0, 3).toUpperCase();
 
     // Check cache first
-    const cacheKey = `${char}_${size}`;
+    const cacheKey = `${chars}_${size}`;
     if (spriteCache.has(cacheKey)) {
         return spriteCache.get(cacheKey)!;
     }
@@ -43,8 +44,8 @@ export function generateLetterSprite(letter: string, size: number = 64): string 
         throw new Error('Could not get canvas context');
     }
 
-    // Generate consistent color from letter
-    const hash = hashCode(char);
+    // Generate consistent color from text
+    const hash = hashCode(chars);
     const hue = hash % 360;
     const saturation = 60 + (hash % 30); // 60-90%
     const lightness = 40 + (hash % 20);  // 40-60%
@@ -61,16 +62,22 @@ export function generateLetterSprite(letter: string, size: number = 64): string 
     ctx.lineWidth = 2;
     ctx.strokeRect(1, 1, size - 2, size - 2);
 
-    // Draw letter
+    // Draw text
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = `bold ${size * 0.6}px Arial, sans-serif`;
+
+    // Dynamic font size based on length
+    let fontSize = size * 0.6;
+    if (chars.length === 2) fontSize = size * 0.5;
+    if (chars.length >= 3) fontSize = size * 0.4;
+
+    ctx.font = `bold ${fontSize}px Arial, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
     ctx.shadowBlur = 4;
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
-    ctx.fillText(char, size / 2, size / 2);
+    ctx.fillText(chars, size / 2, size / 2 + (size * 0.05)); // Slight offset for visual centering
 
     // Convert to data URL
     const dataUrl = canvas.toDataURL('image/png');

@@ -383,8 +383,7 @@ function HomeScreen() {
     return <LoadScreen onComplete={() => setIsLoading(false)} />;
   }
 
-  function zoomIn() { setTileSize(prevSize => prevSize + 8); }
-  function zoomOut() { setTileSize(prevSize => Math.max(16, prevSize - 8)); }
+
 
   const handleAddEnemy = async (prompt: string) => {
     if (!prompt) return;
