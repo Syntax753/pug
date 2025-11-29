@@ -391,6 +391,7 @@ function HomeScreen() {
     if (isGeneratingEnemy) return; // Prevent multiple simultaneous generations
 
     setIsGeneratingEnemy(true);
+    setGenerationStatus(''); // Clear previous status
     setGameLog(prev => [`${getCurrentTime()} Generating enemy from prompt: "${prompt}"...`, ...prev].slice(0, 100));
 
     try {
@@ -406,7 +407,7 @@ function HomeScreen() {
       if (!validateGeneratedCode(moveCode)) {
         setGameLog(prev => [`${getCurrentTime()} Error: Generated code validation failed. Enemy not created.`, ...prev].slice(0, 100));
         setIsGeneratingEnemy(false);
-        setGenerationStatus('');
+        // Keep the error status visible
         return;
       }
 
@@ -450,7 +451,7 @@ function HomeScreen() {
       setGameLog(prev => [`${getCurrentTime()} Error generating enemy: ${error instanceof Error ? error.message : 'Unknown error'}`, ...prev].slice(0, 100));
     } finally {
       setIsGeneratingEnemy(false);
-      setGenerationStatus('');
+      // Do NOT clear generationStatus here, so it persists
     }
   };
 
@@ -480,7 +481,7 @@ function HomeScreen() {
                   }}
                   disabled={isGeneratingEnemy}
                 />
-                {isGeneratingEnemy && <p className={styles.statusText}>{generationStatus}</p>}
+                {generationStatus && <p className={styles.statusText}>{generationStatus}</p>}
               </div>
               <ContentButton
                 text={isGeneratingEnemy ? "Generating..." : "Generate"}
