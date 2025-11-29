@@ -483,6 +483,23 @@ function HomeScreen() {
                 />
                 {generationStatus && <p className={styles.statusText}>{generationStatus}</p>}
               </div>
+            </div>
+          </div>
+
+          <div className={styles.rightColumn}>
+            <div className={styles.notificationArea} style={{
+              overflowY: 'auto',
+              height: `${GRID_HEIGHT * tileSize}px`,
+              border: '1px solid #ccc',
+              padding: '0.5rem',
+              fontFamily: 'monospace',
+              fontSize: '0.8rem'
+            }}>
+              {gameLog.map((msg, index) => (
+                <p key={index} style={{ fontFamily: 'system-ui, sans-serif', fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>{msg}</p>
+              ))}
+            </div>
+            <div style={{ marginTop: '0.5rem', alignSelf: 'flex-start', display: 'flex', gap: '0.5rem' }}>
               <ContentButton
                 text={isGeneratingEnemy ? "Generating..." : "Generate"}
                 onClick={() => {
@@ -493,20 +510,16 @@ function HomeScreen() {
                   }
                 }}
               />
+              <ContentButton
+                text="Happy Horse"
+                onClick={() => {
+                  if (!isGeneratingEnemy) {
+                    handleAddEnemy('Create a happy horse that moves like a knight in chess');
+                  }
+                }}
+                disabled={isGeneratingEnemy}
+              />
             </div>
-          </div>
-
-          <div className={styles.notificationArea} style={{
-            overflowY: 'auto',
-            height: '600px', /* Increased height to match grid better */
-            border: '1px solid #ccc',
-            padding: '0.5rem',
-            fontFamily: 'monospace',
-            fontSize: '0.8rem'
-          }}>
-            {gameLog.map((msg, index) => (
-              <p key={index} style={{ fontFamily: 'system-ui, sans-serif', fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>{msg}</p>
-            ))}
           </div>
         </div>
       </div>

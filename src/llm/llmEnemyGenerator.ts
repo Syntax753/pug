@@ -58,7 +58,8 @@ if (dx !== 0 && context.isValid(context.myPosition.x + Math.sign(dx), context.my
 return context.myPosition;
 
 YOUR TASK:
-Generate ONLY the function body. Keep it CONCISE. Do NOT include function declaration or markdown.`;
+1. First line MUST be a comment with the enemy name: // Name: [EnemyName]
+2. Then generate ONLY the function body. Keep it CONCISE. Do NOT include function declaration or markdown.`;
 
 /**
  * Generate enemy move() code from natural language
@@ -71,14 +72,10 @@ export async function generateEnemyBehavior(
   onStatusUpdate: (status: string, percentComplete: number) => void
 ): Promise<{ enemyName: string; moveCode: string }> {
 
-  // Extract enemy name from prompt (look for patterns like "called X" or "named X")
-  const nameMatch = userPrompt.match(/(?:called|named)\s+(\w+)/i);
-  const enemyName = nameMatch ? nameMatch[1] : 'CustomEnemy';
-
   // Generate the move code
   const prompt = `${userPrompt}\n\nGenerate the move() function body for this enemy. Remember: return only the function body code, no function declaration, no markdown.`;
 
-  const moveCode = await generate(
+  const rawResponse = await generate(
     SYSTEM_PROMPT,
     prompt,
     onStatusUpdate,
@@ -86,18 +83,36 @@ export async function generateEnemyBehavior(
   );
 
   console.log('=== LLM Enemy Generator Debug ===');
-  console.log('Enemy Name:', enemyName);
   console.log('User Prompt:', userPrompt);
   console.log('\nRaw LLM Response:');
-  console.log(moveCode);
+  console.log(rawResponse);
   console.log('\n=================================');
 
+  // Parse the response
+  let enemyName = 'CustomEnemy';
+  let moveCode = rawResponse.trim();
+
+  // Try to extract name from the first line comment
+  const nameCommentMatch = moveCode.match(/^\/\/\s*Name:\s*(\w+)/i);
+  if (nameCommentMatch) {
+    enemyName = nameCommentMatch[1];
+    // Remove the name comment line
+    moveCode = moveCode.replace(/^\/\/\s*Name:\s*.*\n?/, '').trim();
+  } else {
+    // Fallback: Try to extract enemy name from prompt (look for patterns like "called X" or "named X")
+    const nameMatch = userPrompt.match(/(?:called|named)\s+(\w+)/i);
+    if (nameMatch) {
+      enemyName = nameMatch[1];
+    }
+  }
+
   // Clean up the response - remove markdown code blocks if present
-  let cleanedCode = moveCode.trim();
+  let cleanedCode = moveCode;
   cleanedCode = cleanedCode.replace(/^```(?:javascript|js)?\n?/i, '');
   cleanedCode = cleanedCode.replace(/\n?```$/, '');
   cleanedCode = cleanedCode.trim();
 
+  console.log('Extracted Name:', enemyName);
   console.log('Cleaned Code:');
   console.log(cleanedCode);
   console.log('=================================\n');
