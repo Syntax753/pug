@@ -140,8 +140,24 @@ export async function generateEnemyBehavior(
   let params: EnemyParams;
   try {
     // Try to parse JSON from the response
-    // Handle potential markdown code blocks
-    const jsonStr = rawResponse.replace(/^```json\n?|```$/g, '').trim();
+    let jsonStr = rawResponse;
+
+    // 1. Try to find a JSON code block
+    const codeBlockMatch = rawResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlockMatch) {
+      jsonStr = codeBlockMatch[1];
+    } else {
+      // 2. Fallback: Try to find the first '{' and last '}'
+      const firstBrace = rawResponse.indexOf('{');
+      const lastBrace = rawResponse.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        jsonStr = rawResponse.substring(firstBrace, lastBrace + 1);
+      }
+    }
+
+    // Clean up any remaining whitespace
+    jsonStr = jsonStr.trim();
+
     params = JSON.parse(jsonStr);
   } catch (e) {
     console.error('Failed to parse JSON from LLM:', e);

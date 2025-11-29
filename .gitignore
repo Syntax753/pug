@@ -33,3 +33,4 @@ src/assets/layer*/
 
 # TypeScript
 *.tsbuildinfo
+tsconfig.tsbuildinfo
