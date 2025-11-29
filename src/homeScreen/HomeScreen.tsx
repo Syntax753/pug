@@ -471,7 +471,7 @@ function HomeScreen() {
                 <input
                   type="text"
                   className={styles.promptBox}
-                  placeholder="Describe an enemy (e.g., 'Create a Scarab that seeks the pug')..."
+                  placeholder="Describe an enemy (e.g., 'Create a Wraith that chases the pug through walls')..."
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !isGeneratingEnemy) {
                       handleAddEnemy(e.currentTarget.value);
@@ -498,7 +498,7 @@ function HomeScreen() {
                 <p key={index} style={{ fontFamily: 'system-ui, sans-serif', fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>{msg}</p>
               ))}
             </div>
-            <div style={{ marginTop: '0.5rem', alignSelf: 'flex-start', display: 'flex', gap: '0.5rem' }}>
+            <div style={{ marginTop: '16px', alignSelf: 'flex-start', display: 'flex', gap: '0.5rem' }}>
               <ContentButton
                 text={isGeneratingEnemy ? "Generating..." : "Generate"}
                 onClick={() => {
@@ -514,6 +514,24 @@ function HomeScreen() {
                 onClick={() => {
                   if (!isGeneratingEnemy) {
                     handleAddEnemy('Create a happy horse that moves like a knight in chess');
+                  }
+                }}
+                disabled={isGeneratingEnemy}
+              />
+              <ContentButton
+                text="Giggly Ghost"
+                onClick={() => {
+                  if (!isGeneratingEnemy) {
+                    handleAddEnemy('Giggly Ghost that flies through walls but can only move in straight lines');
+                  }
+                }}
+                disabled={isGeneratingEnemy}
+              />
+              <ContentButton
+                text="Scared Rat"
+                onClick={() => {
+                  if (!isGeneratingEnemy) {
+                    handleAddEnemy('A scared rat that runs away horizontally');
                   }
                 }}
                 disabled={isGeneratingEnemy}

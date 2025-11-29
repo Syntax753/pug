@@ -8,58 +8,130 @@ import { generate } from '@/llm/llmUtil';
 /**
  * System prompt that explains the game context to the LLM
  */
-const SYSTEM_PROMPT = `You are a code generator for a grid-based game. Your task is to generate a JavaScript move() method for an enemy based on the user's description.
+const SYSTEM_PROMPT = `You are a game content generator. Your task is to analyze the user's description of an enemy and return a JSON object defining its behavior.
 
 GAME CONTEXT:
-- The game is played on a 20x20 grid
-- There is a player character called "pug" 
-- Enemies move once per turn after the player
-- Position is {x, y} where x is column (0-19) and y is row (0-19)
+- Grid: 20x20
+- Player: "pug"
+- Enemies: Move once per turn
 
-MOVE METHOD SIGNATURE:
-move(context, futureGrid)
-
-CONTEXT OBJECT:
-- context.entities: Array of all entities {id, type, position: {x, y}, ...}
-- context.myPosition: Current position {x, y} of this enemy
-- context.isValid(x, y): Helper function returning true if position (x,y) is valid and empty
-- context.layer1: 2D array of walls (92 = wall)
-
-REQUIREMENTS:
-1. Return a position object: {x, y}
-2. Use context.isValid(x, y) to check if a move is possible
-3. If blocked, return current position (context.myPosition)
-4. By default, prefer vertical movement over horizontal when blocked diagonally
+OUTPUT FORMAT:
+Return ONLY a JSON object with these fields:
+- name: string (Use the full descriptive name, e.g., "Happy Horse", "Giggly Ghost")
+- attitude: "towards" | "away" | "random" (default: "towards")
+- fly: boolean (true if it can fly over walls/obstacles, false otherwise)
+- directions: "all" | "ortho" (default: "all")
+- preference: "vertical" | "horizontal" | "none" (movement axis preference)
 
 EXAMPLES:
+User: "Create a ghost that flies through walls and chases the pug in straight lines"
+JSON: { "name": "Ghost", "attitude": "towards", "fly": true, "directions": "ortho", "preference": "none" }
 
-// Enemy that seeks the pug
-const pug = context.entities.find(e => e.type === 'pug');
-if (!pug) return context.myPosition;
+User: "A scared rat that runs away horizontally"
+JSON: { "name": "Rat", "attitude": "away", "fly": false, "directions": "ortho", "preference": "horizontal" }
+`;
 
-const dx = pug.position.x - context.myPosition.x;
-const dy = pug.position.y - context.myPosition.y;
-
-// Try diagonal
-const newX = context.myPosition.x + Math.sign(dx);
-const newY = context.myPosition.y + Math.sign(dy);
-if (context.isValid(newX, newY)) return {x: newX, y: newY};
-
-// Try vertical first
-if (dy !== 0 && context.isValid(context.myPosition.x, context.myPosition.y + Math.sign(dy))) {
-  return {x: context.myPosition.x, y: context.myPosition.y + Math.sign(dy)};
+interface EnemyParams {
+  name: string;
+  attitude: 'towards' | 'away' | 'random';
+  fly: boolean;
+  directions: 'all' | 'ortho';
+  preference: 'vertical' | 'horizontal' | 'none';
 }
 
-// Try horizontal
-if (dx !== 0 && context.isValid(context.myPosition.x + Math.sign(dx), context.myPosition.y)) {
-  return {x: context.myPosition.x + Math.sign(dx), y: context.myPosition.y};
+/**
+ * Generate the JavaScript move() code based on parameters
+ */
+function generateMoveCode(params: EnemyParams): string {
+  const { attitude, fly, directions, preference } = params;
+
+  if (attitude === 'random') {
+    return `
+      // Random movement
+      const dirs = [
+        {x:0, y:1}, {x:0, y:-1}, {x:1, y:0}, {x:-1, y:0}
+        ${directions === 'all' ? ', {x:1, y:1}, {x:1, y:-1}, {x:-1, y:1}, {x:-1, y:-1}' : ''}
+      ];
+      // Shuffle directions
+      for (let i = dirs.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+      }
+      
+      for (const dir of dirs) {
+        const newX = context.myPosition.x + dir.x;
+        const newY = context.myPosition.y + dir.y;
+        
+        // Check bounds
+        if (newX < 0 || newX >= 20 || newY < 0 || newY >= 20) continue;
+        
+        // Check collision
+        if (futureGrid[newY][newX] !== 0) continue;
+        
+        // Check walls (unless flying)
+        ${fly ? '// Flying ignores walls' : 'if (context.layer1[newY][newX] === 92) continue;'}
+        
+        return {x: newX, y: newY};
+      }
+      return context.myPosition;
+    `;
+  }
+
+  // Logic for seeking/fleeing
+  return `
+    const pug = context.entities.find(e => e.type === 'pug');
+    if (!pug) return context.myPosition;
+
+    let dx = pug.position.x - context.myPosition.x;
+    let dy = pug.position.y - context.myPosition.y;
+
+    ${attitude === 'away' ? '// Run away!\n    dx = -dx;\n    dy = -dy;' : '// Seek player'}
+
+    const moves = [];
+    
+    // Determine move priority based on preference
+    const tryHoriz = dx !== 0;
+    const tryVert = dy !== 0;
+    
+    // Orthogonal moves
+    if (tryHoriz) moves.push({x: Math.sign(dx), y: 0});
+    if (tryVert) moves.push({x: 0, y: Math.sign(dy)});
+    
+    // Diagonal moves (only if allowed)
+    ${directions === 'all' ? `
+    if (tryHoriz && tryVert) {
+      moves.push({x: Math.sign(dx), y: Math.sign(dy)});
+    }` : ''}
+    
+    // Sort moves based on preference
+    ${preference === 'vertical'
+      ? `// Prefer vertical
+         moves.sort((a, b) => Math.abs(b.y) - Math.abs(a.y));`
+      : preference === 'horizontal'
+        ? `// Prefer horizontal
+         moves.sort((a, b) => Math.abs(b.x) - Math.abs(a.x));`
+        : ''
+    }
+
+    for (const move of moves) {
+      const newX = context.myPosition.x + move.x;
+      const newY = context.myPosition.y + move.y;
+      
+      // Check bounds
+      if (newX < 0 || newX >= 20 || newY < 0 || newY >= 20) continue;
+      
+      // Check collision with other entities
+      if (futureGrid[newY][newX] !== 0) continue;
+      
+      // Check walls (unless flying)
+      ${fly ? '// Flying ignores walls' : 'if (context.layer1[newY][newX] === 92) continue;'}
+      
+      return {x: newX, y: newY};
+    }
+    
+    return context.myPosition;
+  `;
 }
-
-return context.myPosition;
-
-YOUR TASK:
-1. First line MUST be a comment with the enemy name: // Name: [EnemyName]
-2. Then generate ONLY the function body. Keep it CONCISE. Do NOT include function declaration or markdown.`;
 
 /**
  * Generate enemy move() code from natural language
@@ -72,54 +144,40 @@ export async function generateEnemyBehavior(
   onStatusUpdate: (status: string, percentComplete: number) => void
 ): Promise<{ enemyName: string; moveCode: string }> {
 
-  // Generate the move code
-  const prompt = `${userPrompt}\n\nGenerate the move() function body for this enemy. Remember: return only the function body code, no function declaration, no markdown.`;
-
   const rawResponse = await generate(
     SYSTEM_PROMPT,
-    prompt,
+    userPrompt,
     onStatusUpdate,
     false // not navigator mode
   );
 
   console.log('=== LLM Enemy Generator Debug ===');
   console.log('User Prompt:', userPrompt);
-  console.log('\nRaw LLM Response:');
-  console.log(rawResponse);
-  console.log('\n=================================');
+  console.log('\nRaw LLM Response:', rawResponse);
 
-  // Parse the response
-  let enemyName = 'CustomEnemy';
-  let moveCode = rawResponse.trim();
-
-  // Try to extract name from the first line comment
-  const nameCommentMatch = moveCode.match(/^\/\/\s*Name:\s*(\w+)/i);
-  if (nameCommentMatch) {
-    enemyName = nameCommentMatch[1];
-    // Remove the name comment line
-    moveCode = moveCode.replace(/^\/\/\s*Name:\s*.*\n?/, '').trim();
-  } else {
-    // Fallback: Try to extract enemy name from prompt (look for patterns like "called X" or "named X")
-    const nameMatch = userPrompt.match(/(?:called|named)\s+(\w+)/i);
-    if (nameMatch) {
-      enemyName = nameMatch[1];
-    }
+  let params: EnemyParams;
+  try {
+    // Try to parse JSON from the response
+    // Handle potential markdown code blocks
+    const jsonStr = rawResponse.replace(/^```json\n?|```$/g, '').trim();
+    params = JSON.parse(jsonStr);
+  } catch (e) {
+    console.error('Failed to parse JSON from LLM:', e);
+    // Fallback default
+    params = { name: 'Unknown', attitude: 'towards', fly: false, directions: 'all', preference: 'vertical' };
   }
 
-  // Clean up the response - remove markdown code blocks if present
-  let cleanedCode = moveCode;
-  cleanedCode = cleanedCode.replace(/^```(?:javascript|js)?\n?/i, '');
-  cleanedCode = cleanedCode.replace(/\n?```$/, '');
-  cleanedCode = cleanedCode.trim();
+  console.log('Parsed Params:', params);
 
-  console.log('Extracted Name:', enemyName);
-  console.log('Cleaned Code:');
-  console.log(cleanedCode);
+  const moveCode = generateMoveCode(params);
+
+  console.log('Generated Code:');
+  console.log(moveCode);
   console.log('=================================\n');
 
   return {
-    enemyName,
-    moveCode: cleanedCode
+    enemyName: params.name,
+    moveCode: moveCode
   };
 }
 
@@ -129,36 +187,12 @@ export async function generateEnemyBehavior(
  * @returns true if valid, false otherwise
  */
 export function validateGeneratedCode(code: string): boolean {
-  // Check for common signs of incomplete code
-  const incompleteSigns = [
-    /return\s*\{[^}]*$/,  // return { without closing brace at end
-    /=\s*$/,              // ends with equals sign
-    /\(\s*$/,             // ends with opening paren
-    /\{\s*$/,             // ends with opening brace (unless it's the last line)
-  ];
-
-  for (const pattern of incompleteSigns) {
-    if (pattern.test(code.trim())) {
-      console.error('❌ Code appears to be incomplete (ends mid-statement)');
-      console.error('Code that failed:');
-      console.error(code);
-      console.error('\n⚠️ The LLM response was likely truncated. Try:');
-      console.error('  1. Using a shorter/simpler prompt');
-      console.error('  2. The model may have token limits');
-      return false;
-    }
-  }
-
   try {
     // Try to create a function with the code
     new Function('context', 'futureGrid', code);
-    console.log('✅ Code validation passed');
     return true;
   } catch (e) {
-    console.error('❌ Generated code validation failed:');
-    console.error('Error:', e);
-    console.error('Code that failed:');
-    console.error(code);
+    console.error('Code validation failed:', e);
     return false;
   }
 }
