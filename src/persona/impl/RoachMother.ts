@@ -39,7 +39,7 @@ class RoachMother implements Persona {
             tryY = Math.max(0, Math.min(futureGrid.length - 1, tryY));
 
             // Check for obstacles in layer1 OR futureGrid
-            if (context.layer1[tryY][tryX] !== 92 && futureGrid[tryY][tryX] === 0) {
+            if (context.isValid(tryX, tryY)) {
                 newX = tryX;
                 newY = tryY;
             } else {

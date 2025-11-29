@@ -179,9 +179,10 @@ function HomeScreen() {
   const [gameLog, setGameLog] = useState<string[]>([]);
   const [turn, setTurn] = useState<number>(0);
   const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
-  const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth * 0.8 / GRID_WIDTH * 0.5));
+  const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerHeight * 0.8 / GRID_HEIGHT));
   const [isGeneratingEnemy, setIsGeneratingEnemy] = useState<boolean>(false);
   const [generationStatus, setGenerationStatus] = useState<string>('');
+  const [isGameOver, setIsGameOver] = useState<boolean>(false);
 
   // Level Data State
   const [levelData] = useState<LevelData>(() => generateLevel(GRID_WIDTH, GRID_HEIGHT));
@@ -208,7 +209,7 @@ function HomeScreen() {
 
   useEffect(() => {
     const handleResize = () => {
-      setTileSize(Math.floor(window.innerWidth * 0.8 / GRID_WIDTH * 0.5));
+      setTileSize(Math.floor(window.innerHeight * 0.8 / GRID_HEIGHT));
     };
     window.addEventListener('resize', handleResize);
     handleResize();
@@ -321,7 +322,7 @@ function HomeScreen() {
         isValid: (x: number, y: number) => {
           return x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT &&
             levelData.layer1[y][x] !== 92 &&
-            futureGrid[y][x] === 0;
+            (futureGrid[y][x] === 0 || futureGrid[y][x] === 'pug');
         }
       };
 
@@ -339,6 +340,13 @@ function HomeScreen() {
       } else {
         entity.position = newPos;
         newLogs.push(`${getCurrentTime()} ${entity.type} ${entity.movementOrder} move: (${newPos.x}, ${newPos.y})`);
+      }
+
+      // Check if enemy moved onto player
+      const player = nextEntities.find(e => e.persona.isPlayer);
+      if (player && newPos.x === player.position.x && newPos.y === player.position.y) {
+        setIsGameOver(true);
+        newLogs.push(`${getCurrentTime()} Game Over! ${entity.type} caught the Pug!`);
       }
     }
 
@@ -360,7 +368,9 @@ function HomeScreen() {
     setHistory([]);
     setTurn(0);
     setGameLog([]);
+    setGameLog([]);
     setAwaitingPlayerInput(true);
+    setIsGameOver(false);
   };
 
   const handleUndo = () => {
@@ -369,7 +379,9 @@ function HomeScreen() {
     setEntities(previousState);
     setHistory(prev => prev.slice(0, -1));
     setTurn(t => Math.max(0, t - 1));
+    setTurn(t => Math.max(0, t - 1));
     setGameLog(prev => [`${getCurrentTime()} Undo last move.`, ...prev].slice(0, 100));
+    setIsGameOver(false);
   };
 
   useEffect(() => {
@@ -380,7 +392,7 @@ function HomeScreen() {
       if (e.key.toLowerCase() === 'r') { handleReset(); return; }
       if (e.key.toLowerCase() === 'z') { handleUndo(); return; }
 
-      if (awaitingPlayerInput) {
+      if (awaitingPlayerInput && !isGameOver) {
         const player = entities.find(e => e.persona.isPlayer);
         if (!player) return;
 
@@ -511,6 +523,27 @@ function HomeScreen() {
                 {generationStatus && <p className={styles.statusText}>{generationStatus}</p>}
               </div>
             </div>
+
+            {isGameOver && (
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                backgroundColor: '#d32f2f',
+                color: 'white',
+                padding: '1rem 2rem',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+                zIndex: 100,
+                textAlign: 'center',
+                border: '2px solid #b71c1c',
+                minWidth: '300px'
+              }}>
+                <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.5rem' }}>Poor Pug!</h2>
+                <p style={{ margin: 0 }}>Press 'z' to undo, or 'r' to restart</p>
+              </div>
+            )}
           </div>
 
           <div className={styles.rightColumn}>
@@ -568,7 +601,7 @@ function HomeScreen() {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 }
 
