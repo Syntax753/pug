@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import ContentButton from '@/components/contentButton/ContentButton';
 import LoadScreen from '@/loadScreen/LoadScreen';
@@ -12,6 +12,7 @@ import RoachMother from '@/persona/impl/RoachMother';
 import DynamicPersona from '@/persona/impl/DynamicPersona';
 import { MoveContext } from "@/persona/Persona";
 import { generateEnemyBehavior, validateGeneratedCode } from '@/llm/llmEnemyGenerator';
+import { playSplatSound } from '@/common/audio';
 
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 20;
@@ -235,6 +236,16 @@ function HomeScreen() {
     runGameTurn();
   }, [isLoading, turn]);
 
+  // ... inside component ...
+
+  const splatIndexRef = useRef(0);
+
+  const triggerSplatSound = () => {
+    const variation = splatIndexRef.current + 1; // 1, 2, 3
+    playSplatSound(variation);
+    splatIndexRef.current = (splatIndexRef.current + 1) % 3;
+  };
+
   const executeTurn = async (playerMove: { x: number, y: number }) => {
     setHistory(prev => [...prev, entities]);
 
@@ -267,6 +278,23 @@ function HomeScreen() {
         }
       };
       const newPlayerPos = playerEntity.persona.move(playerContext, futureGrid);
+
+      // Check for kill
+      const enemyIndex = nextEntities.findIndex(e => !e.persona.isPlayer && e.position.x === newPlayerPos.x && e.position.y === newPlayerPos.y);
+      if (enemyIndex !== -1) {
+        const enemy = nextEntities[enemyIndex];
+        newLogs.push(`${getCurrentTime()} Pug splatted ${enemy.type}!`);
+
+        // Play splat sound
+        triggerSplatSound();
+
+        // Remove enemy
+        nextEntities.splice(enemyIndex, 1);
+
+        // Also remove from futureGrid (though it will be overwritten by player)
+        // This ensures if we had any other logic checking it, it's gone
+        // futureGrid[newPlayerPos.y][newPlayerPos.x] = 0; // Not strictly necessary as we overwrite below
+      }
 
       // Update futureGrid with new position
       futureGrid[newPlayerPos.y][newPlayerPos.x] = playerEntity.type;
@@ -397,8 +425,8 @@ function HomeScreen() {
       // Generate enemy behavior using LLM
       const { enemyName, moveCode } = await generateEnemyBehavior(
         prompt,
-        (status, percent) => {
-          setGenerationStatus(`${status} (${Math.floor(percent * 100)}%)`);
+        (status, _percent) => {
+          setGenerationStatus(status);
         }
       );
 
