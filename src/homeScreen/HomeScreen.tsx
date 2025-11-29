@@ -340,15 +340,11 @@ function HomeScreen() {
         if (!player) return;
 
         let moveVector: { x: number, y: number } | null = null;
-        if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') moveVector = { x: 0, y: -1 };
-        else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') moveVector = { x: 0, y: 1 };
-        else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') moveVector = { x: -1, y: 0 };
-        else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') moveVector = { x: 1, y: 0 };
-        else if (e.key === '1') moveVector = { x: -1, y: 1 };
+        if (e.key === '1') moveVector = { x: -1, y: 1 };
         else if (e.key === '2') moveVector = { x: 0, y: 1 };
         else if (e.key === '3') moveVector = { x: 1, y: 1 };
         else if (e.key === '4') moveVector = { x: -1, y: 0 };
-        else if (e.key === '5' || e.key === ' ') moveVector = { x: 0, y: 0 };
+        else if (e.key === '5') moveVector = { x: 0, y: 0 };
         else if (e.key === '6') moveVector = { x: 1, y: 0 };
         else if (e.key === '7') moveVector = { x: -1, y: -1 };
         else if (e.key === '8') moveVector = { x: 0, y: -1 };

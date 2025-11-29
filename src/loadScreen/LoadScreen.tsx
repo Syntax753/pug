@@ -79,6 +79,10 @@ function LoadScreen(props: Props) {
 
           <div className={styles.actionKeys}>
             <div className={styles.actionRow}>
+              <div className={styles.key}>5</div>
+              <span>Skip Turn</span>
+            </div>
+            <div className={styles.actionRow}>
               <div className={styles.key}>R</div>
               <span>Reset Level</span>
             </div>

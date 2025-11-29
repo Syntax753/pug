@@ -7,7 +7,7 @@ export interface Position {
 
 export interface Entity {
   id: number;
-  type: 'pug' | 'roach' | 'roachMother';
+  type: string;
   persona: Persona;
   position: Position;
   movementOrder: number;
