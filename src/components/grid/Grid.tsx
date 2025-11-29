@@ -8,21 +8,16 @@ import Grass4 from '@/assets/layer0/grass_4.png';
 import Rock0 from '@/assets/layer1/rock_0.png';
 import Rock1 from '@/assets/layer1/rock_1.png';
 import Rock2 from '@/assets/layer1/rock_2.png';
-import Pug from '@/persona/impl/Pug';
-import Roach from '@/persona/impl/Roach';
-import RoachMother from '@/persona/impl/RoachMother';
+import { Entity } from '@/persona/types';
 
 interface GridProps {
   layer0: number[][];
   layer1: number[][];
   entityGrid: (string | number)[][];
+  entities: Entity[];
   width: number;
   tileSize: number;
 }
-
-const pug = new Pug();
-const roach = new Roach();
-const roachMother = new RoachMother();
 
 // Map layer0 values to grass tiles
 const layer0TileMapping: { [key: number]: string | undefined } = {
@@ -42,16 +37,10 @@ const layer1TileMapping: { [key: number]: string | undefined } = {
 };
 
 
-function Grid({ layer0, layer1, entityGrid, width, tileSize }: GridProps) {
+function Grid({ layer0, layer1, entityGrid, entities, width, tileSize }: GridProps) {
   const gridStyle = {
     gridTemplateColumns: `repeat(${width}, 1fr)`,
     width: `${width * tileSize}px`,
-  };
-
-  const entityImageMapping: { [key: string]: string } = {
-    'pug': pug.avatar.South,
-    'roach': roach.avatar.South,
-    'roachMother': roachMother.avatar.South,
   };
 
   return (
@@ -65,7 +54,14 @@ function Grid({ layer0, layer1, entityGrid, width, tileSize }: GridProps) {
           const layer1Image = layer1TileMapping[layer1Value];
 
           const entityType = entityGrid[rowIndex][colIndex];
-          const entityImage = entityType ? entityImageMapping[entityType] : undefined;
+          let entityImage = undefined;
+
+          if (entityType) {
+            const entity = entities.find(e => e.position.x === colIndex && e.position.y === rowIndex);
+            if (entity) {
+              entityImage = entity.persona.avatar.South;
+            }
+          }
 
           return (
             <div key={`${rowIndex}-${colIndex}`} className={styles.gridCell}>

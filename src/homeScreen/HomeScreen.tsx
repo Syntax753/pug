@@ -346,6 +346,9 @@ function HomeScreen() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore game controls if typing in an input
+      if (document.activeElement?.tagName === 'INPUT') return;
+
       if (e.key.toLowerCase() === 'r') { handleReset(); return; }
       if (e.key.toLowerCase() === 'z') { handleUndo(); return; }
 
@@ -456,8 +459,8 @@ function HomeScreen() {
       <TopBar />
       <div className={styles.content}>
         <div className={styles.mainArea}>
-          <div className={styles.gameArea}>
-            <Grid layer0={levelData.layer0} layer1={levelData.layer1} entityGrid={entityGrid} width={GRID_WIDTH} tileSize={tileSize} />
+          <div className={styles.gameArea} onClick={() => (document.activeElement as HTMLElement)?.blur()}>
+            <Grid layer0={levelData.layer0} layer1={levelData.layer1} entityGrid={entityGrid} entities={entities} width={GRID_WIDTH} tileSize={tileSize} />
 
             <div className={styles.controlsRow}>
               <div className={styles.inputWrapper}>
