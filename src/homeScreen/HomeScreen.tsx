@@ -9,7 +9,9 @@ import styles from '@/homeScreen/HomeScreen.module.css';
 import Pug from '@/persona/impl/Pug';
 import Roach from '@/persona/impl/Roach';
 import RoachMother from '@/persona/impl/RoachMother';
+import DynamicPersona from '@/persona/impl/DynamicPersona';
 import { MoveContext } from "@/persona/Persona";
+import { generateEnemyBehavior, validateGeneratedCode } from '@/llm/llmEnemyGenerator';
 
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 20;
@@ -177,6 +179,8 @@ function HomeScreen() {
   const [turn, setTurn] = useState<number>(0);
   const [awaitingPlayerInput, setAwaitingPlayerInput] = useState<boolean>(false);
   const [tileSize, setTileSize] = useState<number>(() => Math.floor(window.innerWidth * 0.8 / GRID_WIDTH * 0.5));
+  const [isGeneratingEnemy, setIsGeneratingEnemy] = useState<boolean>(false);
+  const [generationStatus, setGenerationStatus] = useState<string>('');
 
   // Level Data State
   const [levelData] = useState<LevelData>(() => generateLevel(GRID_WIDTH, GRID_HEIGHT));
@@ -224,7 +228,7 @@ function HomeScreen() {
     if (isLoading) return;
 
     const runGameTurn = () => {
-      setGameLog(prev => [`${getCurrentTime()} Turn ${turn + 1}. Awaiting player move (arrows/WASD/numpad).`, ...prev].slice(0, 100));
+      setGameLog(prev => [`${getCurrentTime()} Turn ${turn + 1}. Awaiting player move (numpad).`, ...prev].slice(0, 100));
       setAwaitingPlayerInput(true);
     };
 
@@ -371,34 +375,70 @@ function HomeScreen() {
 
   const handleAddEnemy = async (prompt: string) => {
     if (!prompt) return;
-    let type: 'roach' | 'roachMother' = 'roach';
-    if (prompt.toLowerCase().includes('mother') || prompt.toLowerCase().includes('flee')) {
-      type = 'roachMother';
-    }
-    const maxMovementOrder = entities.reduce((max, e) => Math.max(max, e.movementOrder), -1);
+    if (isGeneratingEnemy) return; // Prevent multiple simultaneous generations
 
-    // Find a valid empty spot for the new enemy
-    let spawnPos = { x: 8, y: 8 };
-    // Try 10 times to find an empty spot
-    for (let i = 0; i < 10; i++) {
-      const rx = Math.floor(Math.random() * GRID_WIDTH);
-      const ry = Math.floor(Math.random() * GRID_HEIGHT);
-      if (levelData.layer1[ry][rx] === 0 && !entities.some(e => e.position.x === rx && e.position.y === ry)) {
-        spawnPos = { x: rx, y: ry };
-        break;
+    setIsGeneratingEnemy(true);
+    setGameLog(prev => [`${getCurrentTime()} Generating enemy from prompt: "${prompt}"...`, ...prev].slice(0, 100));
+
+    try {
+      // Generate enemy behavior using LLM
+      const { enemyName, moveCode } = await generateEnemyBehavior(
+        prompt,
+        (status, percent) => {
+          setGenerationStatus(`${status} (${Math.floor(percent * 100)}%)`);
+        }
+      );
+
+      // Validate the generated code
+      if (!validateGeneratedCode(moveCode)) {
+        setGameLog(prev => [`${getCurrentTime()} Error: Generated code validation failed. Enemy not created.`, ...prev].slice(0, 100));
+        setIsGeneratingEnemy(false);
+        setGenerationStatus('');
+        return;
       }
+
+      const maxMovementOrder = entities.reduce((max, e) => Math.max(max, e.movementOrder), -1);
+
+      // Spawn at grid center (10, 10)
+      let spawnPos = { x: 10, y: 10 };
+
+      // If center is occupied, try nearby positions
+      if (levelData.layer1[spawnPos.y][spawnPos.x] !== 0 || entities.some(e => e.position.x === spawnPos.x && e.position.y === spawnPos.y)) {
+        // Try positions around center
+        const offsets = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
+        { x: 1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }];
+        for (const offset of offsets) {
+          const testX = 10 + offset.x;
+          const testY = 10 + offset.y;
+          if (testX >= 0 && testX < GRID_WIDTH && testY >= 0 && testY < GRID_HEIGHT &&
+            levelData.layer1[testY][testX] === 0 &&
+            !entities.some(e => e.position.x === testX && e.position.y === testY)) {
+            spawnPos = { x: testX, y: testY };
+            break;
+          }
+        }
+      }
+
+      // Create dynamic persona with generated code
+      const persona = new DynamicPersona(enemyName, moveCode, prompt);
+
+      const newEnemy: Entity = {
+        id: Date.now(),
+        type: enemyName.toLowerCase(),
+        position: spawnPos,
+        persona: persona,
+        movementOrder: maxMovementOrder + 1
+      };
+
+      setEntities(prev => [...prev, newEnemy]);
+      setGameLog(prev => [`${getCurrentTime()} Created enemy '${enemyName}' at (${spawnPos.x}, ${spawnPos.y}) with order ${newEnemy.movementOrder}`, ...prev].slice(0, 100));
+    } catch (error) {
+      console.error('Error generating enemy:', error);
+      setGameLog(prev => [`${getCurrentTime()} Error generating enemy: ${error instanceof Error ? error.message : 'Unknown error'}`, ...prev].slice(0, 100));
+    } finally {
+      setIsGeneratingEnemy(false);
+      setGenerationStatus('');
     }
-
-    const newEnemy: Entity = {
-      id: Date.now(),
-      type: type,
-      position: spawnPos,
-      persona: createPersona(type),
-      movementOrder: maxMovementOrder + 1
-    };
-
-    setEntities(prev => [...prev, newEnemy]);
-    setGameLog(prev => [`${getCurrentTime()} Added new enemy '${newEnemy.type}' (order ${newEnemy.movementOrder})`, ...prev].slice(0, 100));
   };
 
   return (
@@ -406,12 +446,40 @@ function HomeScreen() {
       <TopBar />
       <div className={styles.content}>
         <div className={styles.mainArea}>
-          <Grid layer0={levelData.layer0} layer1={levelData.layer1} entityGrid={entityGrid} width={GRID_WIDTH} tileSize={tileSize} />
+          <div className={styles.gameArea}>
+            <Grid layer0={levelData.layer0} layer1={levelData.layer1} entityGrid={entityGrid} width={GRID_WIDTH} tileSize={tileSize} />
+
+            <div className={styles.controlsRow}>
+              <input
+                type="text"
+                className={styles.promptBox}
+                placeholder="Describe an enemy (e.g., 'Create a Scarab that seeks the pug')..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isGeneratingEnemy) {
+                    handleAddEnemy(e.currentTarget.value);
+                    e.currentTarget.value = '';
+                  }
+                }}
+                disabled={isGeneratingEnemy}
+              />
+              <ContentButton
+                text={isGeneratingEnemy ? "Generating..." : "Generate"}
+                onClick={() => {
+                  if (!isGeneratingEnemy) {
+                    const input = document.querySelector(`.${styles.promptBox}`) as HTMLInputElement;
+                    handleAddEnemy(input.value);
+                    input.value = '';
+                  }
+                }}
+              />
+            </div>
+            {isGeneratingEnemy && <p className={styles.statusText}>{generationStatus}</p>}
+          </div>
+
           <div className={styles.notificationArea} style={{
             overflowY: 'auto',
-            height: '300px',
+            height: '600px', /* Increased height to match grid better */
             border: '1px solid #ccc',
-            marginTop: '1rem',
             padding: '0.5rem',
             fontFamily: 'monospace',
             fontSize: '0.8rem'
@@ -419,19 +487,6 @@ function HomeScreen() {
             {gameLog.map((msg, index) => (
               <p key={index} style={{ fontFamily: 'system-ui, sans-serif', fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>{msg}</p>
             ))}
-          </div>
-        </div>
-        <div className={styles.controlsContainer}>
-          <div>
-            <input
-              type="text"
-              className={styles.promptBox}
-              placeholder="Type 'roach' or 'mother'..."
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAddEnemy(e.currentTarget.value); }}
-            />
-            <ContentButton text="Add Enemy" onClick={() => handleAddEnemy((document.querySelector(`.${styles.promptBox}`) as HTMLInputElement).value)} />
-            <ContentButton text="Zoom In" onClick={zoomIn} />
-            <ContentButton text="Zoom Out" onClick={zoomOut} />
           </div>
         </div>
       </div>
