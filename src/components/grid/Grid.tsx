@@ -1,9 +1,13 @@
 import styles from '@/homeScreen/HomeScreen.module.css';
 
-import Grassland1 from '@/assets/layer0/tile_1.png';
-import Grassland2 from '@/assets/layer0/tile_6.png';
-import Grassland3 from '@/assets/layer0/tile_12.png';
-import Wall1 from '@/assets/layer0/tile_92.png';
+import Grass0 from '@/assets/layer0/grass_0.png';
+import Grass1 from '@/assets/layer0/grass_1.png';
+import Grass2 from '@/assets/layer0/grass_2.png';
+import Grass3 from '@/assets/layer0/grass_3.png';
+import Grass4 from '@/assets/layer0/grass_4.png';
+import Rock0 from '@/assets/layer1/rock_0.png';
+import Rock1 from '@/assets/layer1/rock_1.png';
+import Rock2 from '@/assets/layer1/rock_2.png';
 import Pug from '@/persona/impl/Pug';
 import Roach from '@/persona/impl/Roach';
 import RoachMother from '@/persona/impl/RoachMother';
@@ -20,11 +24,21 @@ const pug = new Pug();
 const roach = new Roach();
 const roachMother = new RoachMother();
 
-const tileMapping: { [key: number]: string | undefined } = {
-  1: Grassland1,
-  6: Grassland2,
-  12: Grassland3,
-  92: Wall1,
+// Map layer0 values to grass tiles
+const layer0TileMapping: { [key: number]: string | undefined } = {
+  1: Grass0,
+  6: Grass1,
+  12: Grass2,
+  // Use all 5 grass variations for more variety
+  0: Grass3,
+  2: Grass4,
+};
+
+// Map layer1 values to rock/obstacle tiles
+const layer1TileMapping: { [key: number]: string | undefined } = {
+  92: Rock0,  // Primary rock type for walls
+  91: Rock1,  // Alternative rock
+  90: Rock2,  // Alternative rock
 };
 
 
@@ -45,10 +59,10 @@ function Grid({ layer0, layer1, entityGrid, width, tileSize }: GridProps) {
       {layer0.map((row, rowIndex) => (
         row.map((_, colIndex) => {
           const bgValue = layer0[rowIndex][colIndex];
-          const bgImage = tileMapping[bgValue];
+          const bgImage = layer0TileMapping[bgValue] || Grass0; // Default to Grass0 if not found
 
           const layer1Value = layer1[rowIndex][colIndex];
-          const layer1Image = tileMapping[layer1Value];
+          const layer1Image = layer1TileMapping[layer1Value];
 
           const entityType = entityGrid[rowIndex][colIndex];
           const entityImage = entityType ? entityImageMapping[entityType] : undefined;
