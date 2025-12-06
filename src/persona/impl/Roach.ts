@@ -13,7 +13,7 @@ class Roach implements Persona {
     public goal: string = "Seek the pug";
     public prompt: string = "";
 
-    public move(context: MoveContext, futureGrid: (string | number)[][]): Position {
+    public move(context: MoveContext, _: (string | number)[][]): Position {
         const { entities, myPosition } = context;
         const pug = entities.find(e => e.type === 'pug');
 
